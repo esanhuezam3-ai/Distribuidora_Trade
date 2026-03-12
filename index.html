@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catálogo Trade - Distribuidora</title>
+    
+    <!-- Librerías básicas que Chrome SÍ permite cargar localmente sin bloqueos -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
+        .product-card { transition: all 0.3s ease; }
+        .product-card:hover { transform: translateY(-8px); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body class="text-slate-900">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo, useEffect } = React;
+
+        // Íconos nativos
+        const Icon = ({ name, size = 20, className = "" }) => {
+            const paths = {
+                ShoppingCart: <React.Fragment><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></React.Fragment>,
+                Plus: <React.Fragment><path d="M5 12h14"/><path d="M12 5v14"/></React.Fragment>,
+                Minus: <path d="M5 12h14"/>,
+                X: <React.Fragment><path d="M18 6 6 18"/><path d="M6 6l12 12"/></React.Fragment>,
+                Search: <React.Fragment><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></React.Fragment>,
+                MapPin: <React.Fragment><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></React.Fragment>,
+                Trash2: <React.Fragment><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></React.Fragment>,
+                Package: <React.Fragment><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></React.Fragment>,
+                MessageCircle: <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 1 1-7.6-12.7 8.38 8.38 0 0 1 3.8.9L21 3z"/>,
+                Lock: <React.Fragment><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></React.Fragment>,
+                LogOut: <React.Fragment><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></React.Fragment>,
+                PlusCircle: <React.Fragment><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></React.Fragment>
+            };
+            return (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                    {paths[name]}
+                </svg>
+            );
+        };
+
+        const App = () => {
+            const [isAdmin, setIsAdmin] = useState(false);
+            const [showLogin, setShowLogin] = useState(false);
+            const [loginForm, setLoginForm] = useState({ user: '', pass: '' });
+            const [loginError, setLoginError] = useState(false);
+            
+            const [cart, setCart] = useState([]);
+            const [isCartOpen, setIsCartOpen] = useState(false);
+            const [searchTerm, setSearchTerm] = useState('');
+            const [quantities, setQuantities] = useState({});
+
+            // Base de datos local (se guarda en tu PC)
+            const [products, setProducts] = useState(() => {
+                const saved = localStorage.getItem('trade_catalog');
+                if (saved) return JSON.parse(saved);
+                return [
+                    { id: 1, brand: "Milo", name: "Milo Familiar 1kg", weight: "1 Kilo", price: 7900, image: "https://i.bolder.run/r/czo0MDY0LGc6MTAwMHg/4621de96/877759-7613030120582.jpg" },
+                    { id: 2, brand: "Nescafé", name: "Tradición Lata", weight: "170g", price: 5700, image: "https://santaisabel.vtexassets.com/arquivos/ids/532559-900-900?width=900&height=900&aspect=true" },
+                    { id: 3, brand: "Nescafé", name: "Tradición XL", weight: "400g", price: 11000, image: "https://media.falabella.com/falabellaCL/126932316_01/w=1200,h=1200,fit=pad" }
+                ];
+            });
+
+            useEffect(() => {
+                localStorage.setItem('trade_catalog', JSON.stringify(products));
+            }, [products]);
+
+            const formatCLP = (v) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(v);
+
+            // Funciones de Administrador
+            const handleLogin = (e) => {
+                e.preventDefault();
+                if (loginForm.user === 'admin' && loginForm.pass === 'trade2026') {
+                    setIsAdmin(true); setShowLogin(false); setLoginError(false);
+                } else { setLoginError(true); }
+            };
+
+            const addProduct = () => {
+                const newProduct = { id: Date.now(), brand: "Marca", name: "Producto Nuevo", weight: "000g", price: 0, image: "" };
+                setProducts([newProduct, ...products]);
+            };
+
+            const updateProduct = (id, field, value) => {
+                setProducts(products.map(p => p.id === id ? { ...p, [field]: value } : p));
+            };
+
+            const deleteProduct = (id) => {
+                setProducts(products.filter(p => p.id !== id));
+            };
+
+            // Funciones del Carrito
+            const addToCart = (p) => {
+                const qty = quantities[p.id] || 1;
+                setCart(prev => {
+                    const exists = prev.find(item => item.id === p.id);
+                    if (exists) return prev.map(item => item.id === p.id ? {...item, qty: item.qty + qty} : item);
+                    return [...prev, {...p, qty: qty}];
+                });
+                setQuantities({...quantities, [p.id]: 1});
+            };
+
+            const cartTotal = cart.reduce((acc, i) => acc + (i.price * i.qty), 0);
+
+            const sendWhatsApp = () => {
+                const itemsStr = cart.map(i => `✅ ${i.qty}x ${i.name}`).join('\n');
+                const msg = `*PEDIDO TRADE*\n📍 Zona: Gran Concepción\n\nHola Marcelo, envío mi pedido:\n\n${itemsStr}\n\n💰 *Total Estimado: ${formatCLP(cartTotal)}*`;
+                window.open(`https://wa.me/56961214930?text=${encodeURIComponent(msg)}`, '_blank');
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col">
+                    {/* Barra Superior - Cambia de color si es Admin */}
+                    <div className={`${isAdmin ? 'bg-orange-600' : 'bg-blue-950'} text-white px-4 py-2 text-xs flex justify-between font-bold uppercase tracking-widest sticky top-0 z-50`}>
+                        <div className="flex items-center gap-2">
+                            <Icon name={isAdmin ? "Lock" : "MapPin"} size={12} className={isAdmin ? "text-white" : "text-blue-400"} /> 
+                            {isAdmin ? "Panel de Edición Activo" : "Repartos en Gran Concepción"}
+                        </div>
+                        {isAdmin && (
+                            <button onClick={() => setIsAdmin(false)} className="bg-white/20 px-3 py-1 rounded-full flex items-center gap-1 hover:bg-white/30 text-[9px]">
+                                <Icon name="LogOut" size={12} /> Salir
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Cabecera */}
+                    <header className="bg-white/90 backdrop-blur-md border-b sticky top-[32px] z-40 px-4 py-4 shadow-sm">
+                        <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-2">
+                                <div className="w-12 h-12 bg-blue-900 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-xl transform -rotate-3">T</div>
+                                <div className="leading-none">
+                                    <h1 className="text-2xl font-black text-blue-950 uppercase tracking-tighter">Trade</h1>
+                                    <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mt-1">Distribuidora</p>
+                                </div>
+                            </div>
+                            
+                            <div className="relative flex-grow max-w-sm hidden md:block">
+                                <Icon name="Search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input type="text" placeholder="Buscar productos..." className="w-full pl-10 pr-4 py-3 bg-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-sm font-medium" onChange={e => setSearchTerm(e.target.value)} />
+                            </div>
+
+                            <button onClick={() => setIsCartOpen(true)} className="p-3.5 bg-blue-600 text-white rounded-2xl shadow-xl relative hover:scale-105 active:scale-95 transition-transform flex items-center gap-2">
+                                <Icon name="ShoppingCart" size={24} />
+                                {cart.length > 0 && <span className="absolute -top-2 -right-2 bg-red-500 text-xs w-6 h-6 flex items-center justify-center rounded-full border-2 border-white font-black">{cart.length}</span>}
+                            </button>
+                        </div>
+                    </header>
+
+                    {/* Contenido Principal */}
+                    <main className="max-w-6xl mx-auto p-6 flex-grow w-full">
+                        <div className="mb-12 rounded-[2.5rem] bg-blue-900 p-8 md:p-12 text-white relative overflow-hidden flex flex-col md:flex-row justify-between items-center gap-8 shadow-2xl">
+                            <div className="relative z-10 text-center md:text-left">
+                                <h2 className="text-4xl md:text-5xl font-black italic mb-2 uppercase tracking-tighter leading-tight">Stock Mayorista.</h2>
+                                <p className="text-blue-200 text-sm font-semibold uppercase tracking-widest opacity-90 italic">Marcelo Medel • Distribuidor Oficial</p>
+                            </div>
+                            <div className="z-10 bg-white/10 backdrop-blur-xl p-6 rounded-3xl border border-white/20 text-center min-w-[150px]">
+                                <div className="text-[10px] font-black text-blue-300 tracking-widest mb-1 uppercase">Catálogo</div>
+                                <div className="text-3xl font-black tracking-tighter uppercase leading-none">2026</div>
+                            </div>
+                            <div className="absolute top-0 right-0 w-1/3 h-full bg-blue-700/20 -skew-x-12 translate-x-10"></div>
+                        </div>
+
+                        {/* Botón Añadir Producto (Solo visible si es Admin) */}
+                        {isAdmin && (
+                            <button onClick={addProduct} className="w-full mb-10 p-10 border-4 border-dashed border-orange-300 bg-orange-50 rounded-[3rem] text-center hover:bg-orange-100 transition-colors group">
+                                <div className="w-16 h-16 bg-orange-600 text-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl group-hover:scale-110 transition-transform">
+                                    <Icon name="PlusCircle" size={32} />
+                                </div>
+                                <h3 className="font-black text-orange-950 uppercase tracking-tighter text-xl">Añadir Nuevo Producto</h3>
+                                <p className="text-orange-700 text-xs font-bold uppercase mt-2 opacity-70">Los cambios se guardan en tu PC</p>
+                            </button>
+                        )}
+
+                        {/* Grilla de Productos */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
+                            {products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())).map(p => (
+                                <div key={p.id} className={`product-card bg-white rounded-[3rem] border-2 flex flex-col group relative ${isAdmin ? 'border-orange-300 shadow-lg' : 'border-slate-100 shadow-sm hover:border-blue-200'}`}>
+                                    <div className="h-64 bg-slate-50 relative flex items-center justify-center p-8 overflow-hidden rounded-t-[3rem]">
+                                        <img src={p.image || 'https://via.placeholder.com/400x400?text=Subir+Imagen'} className="h-full object-contain group-hover:scale-110 transition-transform duration-700" alt={p.name} />
+                                        
+                                        {/* Botón Eliminar (Solo Admin) */}
+                                        {isAdmin && (
+                                            <button onClick={() => deleteProduct(p.id)} className="absolute top-6 right-6 bg-red-500 text-white p-3 rounded-full shadow-lg hover:bg-red-600 transition-transform hover:rotate-12"><Icon name="Trash2" size={18}/></button>
+                                        )}
+
+                                        <div className="absolute top-6 left-6 bg-white/95 backdrop-blur px-4 py-1.5 rounded-full text-[9px] font-black uppercase text-blue-900 shadow-sm border border-slate-100">
+                                            {isAdmin ? <input value={p.brand} className="bg-transparent border-none outline-none w-20 font-black uppercase" onChange={e => updateProduct(p.id, 'brand', e.target.value)} /> : p.brand}
+                                        </div>
+                                    </div>
+
+                                    <div className="p-8 flex flex-col flex-grow">
+                                        {isAdmin ? (
+                                            /* Formulario de Edición (Admin) */
+                                            <div className="space-y-4">
+                                                <input value={p.image} className="w-full p-3 bg-orange-50 rounded-xl text-[10px] border border-orange-200 outline-none focus:border-orange-500" placeholder="Link de imagen..." onChange={e => updateProduct(p.id, 'image', e.target.value)} />
+                                                <input value={p.name} className="w-full p-3 bg-orange-50 rounded-xl text-sm font-black border border-orange-200 outline-none focus:border-orange-500" placeholder="Nombre del producto..." onChange={e => updateProduct(p.id, 'name', e.target.value)} />
+                                                <div className="flex gap-3">
+                                                    <input value={p.weight} className="w-1/2 p-3 bg-orange-50 rounded-xl text-xs font-bold border border-orange-200 outline-none" placeholder="Peso..." onChange={e => updateProduct(p.id, 'weight', e.target.value)} />
+                                                    <input type="number" value={p.price} className="w-1/2 p-3 bg-orange-50 rounded-xl text-sm font-black border border-orange-200 outline-none" placeholder="Precio..." onChange={e => updateProduct(p.id, 'price', parseInt(e.target.value) || 0)} />
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            /* Vista Normal Cliente */
+                                            <>
+                                                <h3 className="font-black text-2xl text-slate-900 tracking-tighter leading-none mb-1 uppercase">{p.name}</h3>
+                                                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-8">{p.weight}</p>
+                                                
+                                                <div className="bg-slate-50 p-6 rounded-[2rem] flex justify-between items-center mb-8 border border-slate-100 shadow-inner group-hover:bg-blue-50 transition-colors">
+                                                    <div><span className="text-[9px] text-slate-400 font-black uppercase block mb-1">Precio Neto</span><span className="text-3xl font-black text-blue-900 tracking-tighter leading-none">{formatCLP(p.price)}</span></div>
+                                                    <div className="bg-white p-4 rounded-2xl shadow-sm text-blue-200"><Icon name="Package" size={28} /></div>
+                                                </div>
+
+                                                <div className="mt-auto flex items-center gap-4">
+                                                    <div className="flex items-center bg-slate-200 rounded-2xl p-1.5 border border-slate-300">
+                                                        <button onClick={() => setQuantities({...quantities, [p.id]: Math.max(1, (quantities[p.id] || 1) - 1)})} className="w-10 h-10 flex items-center justify-center hover:bg-white rounded-xl transition-all shadow-sm active:scale-90"><Icon name="Minus" size={18}/></button>
+                                                        <span className="w-10 text-center font-black text-lg">{quantities[p.id] || 1}</span>
+                                                        <button onClick={() => setQuantities({...quantities, [p.id]: (quantities[p.id] || 1) + 1})} className="w-10 h-10 flex items-center justify-center hover:bg-white rounded-xl transition-all shadow-sm active:scale-90"><Icon name="Plus" size={18}/></button>
+                                                    </div>
+                                                    <button onClick={() => addToCart(p)} className="flex-grow bg-blue-900 text-white font-black py-5 px-6 rounded-[1.5rem] shadow-xl shadow-blue-100 active:scale-95 transition-all text-xs uppercase tracking-widest">Añadir</button>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </main>
+
+                    {/* Carrito Lateral */}
+                    {isCartOpen && (
+                        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[100] flex justify-end">
+                            <div className="bg-white w-full max-w-md flex flex-col shadow-2xl rounded-l-[3.5rem] h-full overflow-hidden border-l border-white/20">
+                                <div className="p-10 border-b flex justify-between items-center bg-blue-50/50 rounded-tl-[3.5rem]">
+                                    <div className="flex items-center gap-5">
+                                        <div className="bg-blue-900 p-4 rounded-2xl text-white shadow-xl transform -rotate-3"><Icon name="ShoppingCart" size={28} /></div>
+                                        <div><h2 className="text-2xl font-black uppercase tracking-tighter text-blue-950 leading-none">Mi Pedido</h2><p className="text-[10px] text-blue-500 font-black uppercase mt-1 tracking-widest">Trade Distribuidora</p></div>
+                                    </div>
+                                    <button onClick={() => setIsCartOpen(false)} className="p-3.5 hover:bg-white rounded-full transition-all group"><Icon name="X" size={36} className="text-slate-300 group-hover:text-slate-900" /></button>
+                                </div>
+                                <div className="flex-grow overflow-y-auto p-10 space-y-6 custom-scroll">
+                                    {cart.length === 0 ? (
+                                        <div className="text-center py-40 opacity-15 flex flex-col items-center"><Icon name="ShoppingCart" size={140} className="mb-8" /><p className="font-black uppercase tracking-[0.4em] text-sm">Tu carro está vacío</p></div>
+                                    ) : (
+                                        cart.map(item => (
+                                            <div key={item.id} className="flex gap-6 p-6 rounded-[2.5rem] border border-slate-100 bg-slate-50 shadow-sm">
+                                                <img src={item.image} className="w-20 h-20 object-contain flex-shrink-0" alt="" />
+                                                <div className="flex-grow min-w-0">
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <h4 className="font-black text-sm truncate uppercase tracking-tight text-slate-800 italic">{item.name}</h4>
+                                                        <button onClick={() => setCart(c => c.filter(i => i.id !== item.id))} className="text-slate-300 hover:text-red-500 p-1"><Icon name="Trash2" size={20} /></button>
+                                                    </div>
+                                                    <div className="flex items-center justify-between mt-4">
+                                                        <span className="text-[11px] font-black text-blue-600 bg-white border border-blue-100 px-4 py-2 rounded-full tracking-widest uppercase">{item.qty} UN.</span>
+                                                        <span className="text-xl font-black text-slate-900 tracking-tighter">{formatCLP(item.price * item.qty)}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                                {cart.length > 0 && (
+                                    <div className="p-10 bg-white border-t rounded-t-[4rem] shadow-inner mt-auto">
+                                        <div className="flex justify-between items-center mb-10 px-4">
+                                            <div><span className="text-slate-400 font-black uppercase text-[11px] tracking-[0.4em] block mb-2">Inversión Final</span><span className="text-5xl font-black text-blue-950 tracking-tighter">{formatCLP(cartTotal)}</span></div>
+                                        </div>
+                                        <button onClick={sendWhatsApp} className="w-full bg-green-600 text-white font-black py-8 rounded-[2.5rem] flex items-center justify-center gap-5 shadow-2xl shadow-green-100 active:scale-95 transition-all text-xl uppercase tracking-widest transform hover:-rotate-1"><Icon name="MessageCircle" size={36} /> Confirmar Pedido</button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Modal Acceso Administrador */}
+                    {showLogin && (
+                        <div className="fixed inset-0 bg-blue-950/95 backdrop-blur-md z-[110] flex items-center justify-center p-4">
+                            <div className="bg-white w-full max-w-sm rounded-[3.5rem] p-12 shadow-2xl relative text-center border-2 border-white/20">
+                                <button onClick={() => setShowLogin(false)} className="absolute top-8 right-8 text-slate-300 hover:text-slate-500 transition-all active:scale-90"><Icon name="X" size={32} /></button>
+                                <div className="w-20 h-20 bg-blue-900 rounded-[2rem] flex items-center justify-center text-white mx-auto mb-8 shadow-2xl shadow-blue-100"><Icon name="Lock" size={40} /></div>
+                                <h2 className="text-2xl font-black text-blue-950 uppercase tracking-tighter mb-8">Acceso Admin</h2>
+                                <form onSubmit={handleLogin} className="space-y-5 text-left">
+                                    <input type="text" required placeholder="Usuario" className="w-full px-6 py-5 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] outline-none focus:border-blue-500 font-bold text-sm" onChange={e => setLoginForm({...loginForm, user: e.target.value})} />
+                                    <input type="password" required placeholder="Contraseña" className="w-full px-6 py-5 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] outline-none focus:border-blue-500 font-bold text-sm" onChange={e => setLoginForm({...loginForm, pass: e.target.value})} />
+                                    {loginError && <p className="text-red-500 text-[10px] font-black uppercase text-center tracking-widest mt-2">Datos incorrectos</p>}
+                                    <button className="w-full bg-blue-900 text-white font-black py-6 rounded-[1.5rem] shadow-2xl active:scale-95 transition-all text-xs uppercase tracking-widest mt-2">Ingresar</button>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Pie de Página y botón Admin */}
+                    <footer className="py-24 text-center border-t bg-white mt-12 w-full">
+                        <div className="max-w-xs mx-auto mb-10 bg-slate-50 p-8 rounded-[4rem] border border-slate-100 shadow-sm flex items-center justify-center gap-4 transform rotate-3">
+                            <div className="w-14 h-14 bg-blue-900 rounded-[1.25rem] flex items-center justify-center text-white font-black text-xl shadow-xl shadow-blue-100">MM</div>
+                            <div className="text-left leading-none">
+                                <p className="text-[10px] text-slate-400 font-black uppercase mb-1 tracking-widest">Tu Vendedor</p>
+                                <p className="text-xl font-black text-slate-800 uppercase tracking-tighter italic">Marcelo Medel</p>
+                            </div>
+                        </div>
+                        
+                        <p className="text-[10px] font-bold text-slate-300 uppercase tracking-[0.5em] mb-8">Trade SPA • Concepción</p>
+                        
+                        {/* Botón para entrar al panel de Admin */}
+                        {!isAdmin && (
+                            <button onClick={() => setShowLogin(true)} className="text-[11px] font-black text-slate-400 uppercase tracking-[0.4em] hover:text-blue-600 transition-all p-4 bg-slate-50 rounded-full border border-slate-100 hover:border-blue-200">Administración</button>
+                        )}
+                    </footer>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
