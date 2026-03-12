@@ -5,13 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Catálogo Trade - Distribuidora</title>
     <link rel="icon" href="./trade-icon.png?v=2" type="image/png">
-<link rel="shortcut icon" href="./trade-icon.png?v=2" type="image/png">
-    
+    <link rel="shortcut icon" href="./trade-icon.png?v=2" type="image/png">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
@@ -24,92 +22,41 @@
 
     <script type="module">
       import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js';
-      import {
-        getFirestore,
-        collection,
-        addDoc,
-        doc,
-        updateDoc,
-        deleteDoc,
-        onSnapshot,
-        getDocs,
-        serverTimestamp,
-        setLogLevel
-      } from 'https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js';
+      import { getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot, getDocs, serverTimestamp, setLogLevel } from 'https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js';
 
-      const firebaseConfig = {
-        apiKey: "AIzaSyC-d7yJnN9uJOozJvD1kO8JKWl88SrJwRI",
-        authDomain: "catalogo-trade.firebaseapp.com",
-        projectId: "catalogo-trade",
-        storageBucket: "catalogo-trade.firebasestorage.app",
-        messagingSenderId: "599913548649",
-        appId: "1:599913548649:web:aa1c252cea3ac5692ecbf8"
-      };
+      const firebaseConfig = { apiKey: "AIzaSyC-d7yJnN9uJOozJvD1kO8JKWl88SrJwRI", authDomain: "catalogo-trade.firebaseapp.com", projectId: "catalogo-trade", storageBucket: "catalogo-trade.firebasestorage.app", messagingSenderId: "599913548649", appId: "1:599913548649:web:aa1c252cea3ac5692ecbf8" };
 
       const defaultProducts = [
-        { brand: "Milo", name: "Milo Familiar 1kg", weight: "1 Kilo", price: 7900, image: "https://i.bolder.run/r/czo0MDY0LGc6MTAwMHg/4621de96/877759-7613030120582.jpg", category: 'Abarrotes', createdAt: serverTimestamp() },
-        { brand: "Nescafé", name: "Tradición Lata", weight: "170g", price: 5700, image: "https://santaisabel.vtexassets.com/arquivos/ids/532559-900-900?width=900&height=900&aspect=true", category: 'Abarrotes', createdAt: serverTimestamp() },
-        { brand: "Nescafé", name: "Tradición XL", weight: "400g", price: 11000, image: "https://media.falabella.com/falabellaCL/126932316_01/w=1200,h=1200,fit=pad", category: 'Abarrotes', createdAt: serverTimestamp() }
+        { brand: "Milo", name: "Milo Familiar 1kg", weight: "1 Kilo", price: 7900, image: "https://i.bolder.run/r/czo0MDY0LGc6MTAwMHg/4621de96/877759-7613030120582.jpg", category: 'Abarrotes', inStock: true, createdAt: serverTimestamp() },
+        { brand: "Nescafé", name: "Tradición Lata", weight: "170g", price: 5700, image: "https://santaisabel.vtexassets.com/arquivos/ids/532559-900-900?width=900&height=900&aspect=true", category: 'Abarrotes', inStock: true, createdAt: serverTimestamp() },
+        { brand: "Nescafé", name: "Tradición XL", weight: "400g", price: 11000, image: "https://media.falabella.com/falabellaCL/126932316_01/w=1200,h=1200,fit=pad", category: 'Abarrotes', inStock: true, createdAt: serverTimestamp() }
       ];
 
       setLogLevel('silent');
-
       const app = initializeApp(firebaseConfig);
       const db = getFirestore(app);
       const productsRef = collection(db, 'products');
 
       async function seedProductsIfEmpty() {
         const snap = await getDocs(productsRef);
-        if (snap.empty) {
-          for (const product of defaultProducts) {
-            await addDoc(productsRef, product);
-          }
-        }
+        if (snap.empty) { for (const product of defaultProducts) await addDoc(productsRef, product); }
       }
 
       async function addProduct() {
-        const newProduct = {
-          brand: 'Marca',
-          name: 'Producto Nuevo',
-          weight: '000g',
-          price: 0,
-          image: '',
-          category: 'Abarrotes',
-          createdAt: serverTimestamp()
-        };
-        await addDoc(productsRef, newProduct);
+        await addDoc(productsRef, { brand: 'Marca', name: 'Producto Nuevo', weight: '000g', price: 0, image: '', category: 'Abarrotes', inStock: true, createdAt: serverTimestamp() });
       }
 
-      async function updateProduct(id, data) {
-        const productRef = doc(db, 'products', id);
-        await updateDoc(productRef, data);
-      }
-
-      async function deleteProduct(id) {
-        const productRef = doc(db, 'products', id);
-        await deleteDoc(productRef);
-      }
+      async function updateProduct(id, data) { await updateDoc(doc(db, 'products', id), data); }
+      async function deleteProduct(id) { await deleteDoc(doc(db, 'products', id)); }
 
       function subscribeProducts(callback, onError) {
         return onSnapshot(productsRef, (snapshot) => {
-          const items = snapshot.docs
-            .map((d) => ({ id: d.id, ...d.data() }))
-            .sort((a, b) => {
-              const aSec = a.createdAt?.seconds || 0;
-              const bSec = b.createdAt?.seconds || 0;
-              return bSec - aSec;
-            });
+          const items = snapshot.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
           callback(items);
         }, onError);
       }
 
-      window.firebaseServices = {
-        ready: seedProductsIfEmpty(),
-        addProduct,
-        updateProduct,
-        deleteProduct,
-        subscribeProducts
-      };
+      window.firebaseServices = { ready: seedProductsIfEmpty(), addProduct, updateProduct, deleteProduct, subscribeProducts };
     </script>
 
     <script type="text/babel">
@@ -129,22 +76,15 @@
                 Lock: <React.Fragment><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></React.Fragment>,
                 LogOut: <React.Fragment><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></React.Fragment>,
                 PlusCircle: <React.Fragment><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></React.Fragment>,
-                UploadCloud: <React.Fragment><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/><polyline points="16 16 12 12 8 16"/></React.Fragment>
+                UploadCloud: <React.Fragment><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/><polyline points="16 16 12 12 8 16"/></React.Fragment>,
+                Eye: <React.Fragment><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></React.Fragment>,
+                EyeOff: <React.Fragment><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></React.Fragment>
             };
-            return (
-                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
-                    {paths[name]}
-                </svg>
-            );
+            return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>{paths[name]}</svg>;
         };
 
         const App = () => {
-            const DEFAULT_CATEGORIES = [
-                'Abarrotes',
-                'Aseo y Cuidado Personal',
-                'Confites'
-            ];
-
+            const DEFAULT_CATEGORIES = ['Abarrotes', 'Aseo y Cuidado Personal', 'Confites'];
             const [isAdmin, setIsAdmin] = useState(false);
             const [showLogin, setShowLogin] = useState(false);
             const [loginForm, setLoginForm] = useState({ user: '', pass: '' });
@@ -163,38 +103,22 @@
 
             useEffect(() => {
                 let unsubscribe = null;
-
                 const start = async () => {
                     try {
                         await window.firebaseServices.ready;
                         unsubscribe = window.firebaseServices.subscribeProducts(
                             (items) => {
                                 setProducts(items);
-                                const discoveredCategories = items
-                                    .map(item => (item.category || '').trim())
-                                    .filter(Boolean);
+                                const discoveredCategories = items.map(item => (item.category || '').trim()).filter(Boolean);
                                 setCategories(Array.from(new Set([...DEFAULT_CATEGORIES, ...discoveredCategories])));
                                 setLoadingProducts(false);
                             },
-                            (error) => {
-                                console.error(error);
-                                setFirebaseError('No se pudo sincronizar con Firebase.');
-                                setLoadingProducts(false);
-                            }
+                            (error) => { console.error(error); setFirebaseError('Error al sincronizar.'); setLoadingProducts(false); }
                         );
-                    } catch (error) {
-                        console.error(error);
-                        setFirebaseError('No se pudo conectar con Firebase. Revisa Firestore y sus reglas.');
-                        setLoadingProducts(false);
-                    }
+                    } catch (error) { console.error(error); setFirebaseError('Error de conexión a Firebase.'); setLoadingProducts(false); }
                 };
-
                 start();
-
-                return () => {
-                    if (unsubscribe) unsubscribe();
-                    Object.values(saveTimers.current).forEach(clearTimeout);
-                };
+                return () => { if (unsubscribe) unsubscribe(); Object.values(saveTimers.current).forEach(clearTimeout); };
             }, []);
 
             const formatCLP = (v) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(v || 0);
@@ -207,10 +131,7 @@
             };
 
             const handleCategorySelectChange = (productId, selectedValue) => {
-                if (selectedValue === '__new__') {
-                    setTimeout(() => categoryInputRefs.current[productId]?.focus(), 0);
-                    return;
-                }
+                if (selectedValue === '__new__') { setTimeout(() => categoryInputRefs.current[productId]?.focus(), 0); return; }
                 updateProduct(productId, 'category', selectedValue);
             };
 
@@ -218,26 +139,15 @@
                 const newCategory = ensureCategoryExists(rawValue);
                 if (!newCategory) return;
                 updateProduct(productId, 'category', newCategory);
-                if (categoryInputRefs.current[productId]) {
-                    categoryInputRefs.current[productId].value = '';
-                }
+                if (categoryInputRefs.current[productId]) categoryInputRefs.current[productId].value = '';
             };
 
             const handleLogin = (e) => {
                 e.preventDefault();
-                if (loginForm.user === 'admin' && loginForm.pass === 'trade2026') {
-                    setIsAdmin(true); setShowLogin(false); setLoginError(false);
-                } else { setLoginError(true); }
+                if (loginForm.user === 'admin' && loginForm.pass === 'trade2026') { setIsAdmin(true); setShowLogin(false); setLoginError(false); } else { setLoginError(true); }
             };
 
-            const addProduct = async () => {
-                try {
-                    await window.firebaseServices.addProduct();
-                } catch (error) {
-                    console.error(error);
-                    alert('No se pudo crear el producto en Firebase.');
-                }
-            };
+            const addProduct = async () => { try { await window.firebaseServices.addProduct(); } catch (error) { alert('Error al crear producto.'); } };
 
             const updateProduct = (id, field, value) => {
                 const finalValue = field === 'category' ? ensureCategoryExists(value) : value;
@@ -246,33 +156,19 @@
                 const timerKey = `${id}_${field}`;
                 if (saveTimers.current[timerKey]) clearTimeout(saveTimers.current[timerKey]);
                 saveTimers.current[timerKey] = setTimeout(async () => {
-                    try {
-                        await window.firebaseServices.updateProduct(id, { [field]: finalValue });
-                    } catch (error) {
-                        console.error(error);
-                        alert('No se pudo guardar el cambio en Firebase.');
-                    }
+                    try { await window.firebaseServices.updateProduct(id, { [field]: finalValue }); } catch (error) { alert('Error al guardar.'); }
                 }, 500);
             };
 
             const deleteProduct = async (id) => {
-                if(window.confirm("¿Estás seguro de que quieres eliminar este producto?")) {
-                    try {
-                        await window.firebaseServices.deleteProduct(id);
-                    } catch (error) {
-                        console.error(error);
-                        alert('No se pudo eliminar el producto en Firebase.');
-                    }
-                }
+                if(window.confirm("¿Seguro de que quieres eliminar este producto?")) { try { await window.firebaseServices.deleteProduct(id); } catch (error) { alert('Error al eliminar.'); } }
             };
 
             const handleImageUpload = (e, productId) => {
                 const file = e.target.files[0];
                 if (file) {
                     const reader = new FileReader();
-                    reader.onloadend = () => {
-                        updateProduct(productId, 'image', reader.result);
-                    };
+                    reader.onloadend = () => updateProduct(productId, 'image', reader.result);
                     reader.readAsDataURL(file);
                 }
             };
@@ -298,55 +194,38 @@
             const menuCategories = useMemo(() => ['Todas', ...Array.from(new Set(categories))], [categories]);
 
             const filteredProducts = products.filter(p => {
+                if (!isAdmin && p.inStock === false) return false;
                 const term = searchTerm.toLowerCase();
-                const matchesSearch = [p.name, p.brand, p.weight, p.category || '']
-                    .some(value => (value || '').toLowerCase().includes(term));
+                const matchesSearch = [p.name, p.brand, p.weight, p.category || ''].some(value => (value || '').toLowerCase().includes(term));
                 const productCategory = p.category || 'Abarrotes';
                 const matchesCategory = selectedCategory === 'Todas' || productCategory === selectedCategory;
                 return matchesSearch && matchesCategory;
             });
 
-            const groupedProducts = categories
-                .map(category => ({
-                    category,
-                    items: filteredProducts.filter(product => (product.category || 'Abarrotes') === category)
-                }))
-                .filter(group => group.items.length > 0);
+            const groupedProducts = categories.map(category => ({
+                category, items: filteredProducts.filter(product => (product.category || 'Abarrotes') === category)
+            })).filter(group => group.items.length > 0);
 
             const uncategorizedProducts = filteredProducts.filter(product => !categories.includes(product.category || ''));
-            if (uncategorizedProducts.length > 0) {
-                groupedProducts.push({ category: 'Sin categoría', items: uncategorizedProducts });
-            }
+            if (uncategorizedProducts.length > 0) { groupedProducts.push({ category: 'Sin categoría', items: uncategorizedProducts }); }
 
             return (
                 <div className="min-h-screen flex flex-col">
                     <div className={`${isAdmin ? 'bg-orange-600' : 'bg-blue-950'} text-white px-4 py-2 text-xs flex justify-between font-bold uppercase tracking-widest sticky top-0 z-50`}>
-                        <div className="flex items-center gap-2">
-                            <Icon name={isAdmin ? "Lock" : "MapPin"} size={12} className={isAdmin ? "text-white" : "text-blue-400"} /> 
-                            {isAdmin ? "Panel de Edición Activo" : "Repartos en Gran Concepción"}
-                        </div>
-                        {isAdmin && (
-                            <button onClick={() => setIsAdmin(false)} className="bg-white/20 px-3 py-1 rounded-full flex items-center gap-1 hover:bg-white/30 text-[9px]">
-                                <Icon name="LogOut" size={12} /> Salir
-                            </button>
-                        )}
+                        <div className="flex items-center gap-2"><Icon name={isAdmin ? "Lock" : "MapPin"} size={12} className={isAdmin ? "text-white" : "text-blue-400"} /> {isAdmin ? "Panel de Edición Activo" : "Repartos en Gran Concepción"}</div>
+                        {isAdmin && <button onClick={() => setIsAdmin(false)} className="bg-white/20 px-3 py-1 rounded-full flex items-center gap-1 hover:bg-white/30 text-[9px]"><Icon name="LogOut" size={12} /> Salir</button>}
                     </div>
 
                     <header className="bg-white/90 backdrop-blur-md border-b sticky top-[32px] z-40 px-4 py-4 shadow-sm">
                         <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
                             <div className="flex items-center gap-2">
                                 <div className="w-12 h-12 bg-blue-900 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-xl">T</div>
-                                <div className="leading-none">
-                                    <h1 className="text-2xl font-black text-blue-950 uppercase tracking-tighter">Trade</h1>
-                                    <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mt-1">Distribuidora</p>
-                                </div>
+                                <div className="leading-none"><h1 className="text-2xl font-black text-blue-950 uppercase tracking-tighter">Trade</h1><p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mt-1">Distribuidora</p></div>
                             </div>
-                            
                             <div className="relative flex-grow max-w-sm hidden md:block">
                                 <Icon name="Search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                 <input type="text" placeholder="Buscar productos..." className="w-full pl-10 pr-4 py-3 bg-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-sm font-medium" onChange={e => setSearchTerm(e.target.value)} />
                             </div>
-
                             <button onClick={() => setIsCartOpen(true)} className="p-3.5 bg-blue-600 text-white rounded-2xl shadow-xl relative hover:scale-105 active:scale-95 transition-transform flex items-center gap-2">
                                 <Icon name="ShoppingCart" size={24} />
                                 {cart.length > 0 && <span className="absolute -top-2 -right-2 bg-red-500 text-xs w-6 h-6 flex items-center justify-center rounded-full border-2 border-white font-black">{cart.length}</span>}
@@ -366,69 +245,58 @@
                             </div>
                         </div>
 
-                        {firebaseError && (
-                            <div className="mb-8 rounded-3xl border border-red-200 bg-red-50 p-5 text-sm font-bold text-red-700">
-                                {firebaseError}
-                            </div>
-                        )}
+                        {firebaseError && <div className="mb-8 rounded-3xl border border-red-200 bg-red-50 p-5 text-sm font-bold text-red-700">{firebaseError}</div>}
 
                         {isAdmin && (
                             <button onClick={addProduct} className="w-full mb-10 p-10 border-4 border-dashed border-orange-300 bg-orange-50 rounded-[3rem] text-center hover:bg-orange-100 transition-colors group">
-                                <div className="w-16 h-16 bg-orange-600 text-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl group-hover:scale-110 transition-transform">
-                                    <Icon name="PlusCircle" size={32} />
-                                </div>
+                                <div className="w-16 h-16 bg-orange-600 text-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl group-hover:scale-110 transition-transform"><Icon name="PlusCircle" size={32} /></div>
                                 <h3 className="font-black text-orange-950 uppercase tracking-tighter text-xl">Añadir Nuevo Producto</h3>
-                                <p className="text-orange-700 text-xs font-bold uppercase mt-2 opacity-70">Ahora los cambios se guardan en Firebase</p>
                             </button>
                         )}
 
                         <div className="flex flex-wrap gap-3 mb-10 justify-center">
                             {menuCategories.map(cat => (
-                                <button
-                                    key={cat}
-                                    onClick={() => setSelectedCategory(cat)}
-                                    className={`px-5 py-2 rounded-full text-xs font-bold uppercase tracking-widest transition ${
-                                        selectedCategory === cat
-                                            ? 'bg-blue-900 text-white shadow-lg shadow-blue-100'
-                                            : 'bg-slate-100 text-slate-600 hover:bg-blue-100'
-                                    }`}
-                                >
-                                    {cat}
-                                </button>
+                                <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-5 py-2 rounded-full text-xs font-bold uppercase tracking-widest transition ${selectedCategory === cat ? 'bg-blue-900 text-white shadow-lg shadow-blue-100' : 'bg-slate-100 text-slate-600 hover:bg-blue-100'}`}>{cat}</button>
                             ))}
                         </div>
 
-                        {loadingProducts ? (
-                            <div className="text-center py-20 text-slate-500 font-bold">Cargando productos desde Firebase...</div>
-                        ) : groupedProducts.length === 0 ? (
-                            <div className="text-center py-20 text-slate-500 font-bold">No hay productos para mostrar.</div>
-                        ) : (
+                        {loadingProducts ? <div className="text-center py-20 text-slate-500 font-bold">Cargando productos...</div> : groupedProducts.length === 0 ? <div className="text-center py-20 text-slate-500 font-bold">No hay productos en esta categoría.</div> : (
                             <div className="space-y-14">
                                 {groupedProducts.map(group => (
                                     <section key={group.category}>
                                         <div className="flex items-center justify-between mb-6 gap-4">
-                                            <div>
-                                                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-blue-500 mb-2">Categoría</p>
-                                                <h3 className="text-2xl md:text-3xl font-black text-blue-950 tracking-tighter">{group.category}</h3>
-                                            </div>
+                                            <div><p className="text-[10px] font-black uppercase tracking-[0.4em] text-blue-500 mb-2">Categoría</p><h3 className="text-2xl md:text-3xl font-black text-blue-950 tracking-tighter">{group.category}</h3></div>
                                             <div className="px-4 py-2 rounded-full bg-blue-50 text-blue-900 text-xs font-black uppercase tracking-widest border border-blue-100">{group.items.length} producto{group.items.length !== 1 ? 's' : ''}</div>
                                         </div>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
                                             {group.items.map(p => (
-                                                <div key={p.id} className={`product-card bg-white rounded-[3rem] border-2 flex flex-col group relative ${isAdmin ? 'border-orange-300 shadow-lg' : 'border-slate-100 shadow-sm hover:border-blue-200'}`}>
+                                                <div key={p.id} className={`product-card bg-white rounded-[3rem] border-2 flex flex-col group relative ${isAdmin ? 'border-orange-300 shadow-lg' : 'border-slate-100 shadow-sm hover:border-blue-200'} ${p.inStock === false && isAdmin ? 'opacity-60 grayscale' : ''}`}>
                                                     <div className="h-64 bg-slate-50 relative flex items-center justify-center p-8 overflow-hidden rounded-t-[3rem]">
                                                         <img src={p.image || 'https://via.placeholder.com/400x400?text=Sube+una+foto'} className="h-full object-contain group-hover:scale-110 transition-transform duration-700" alt={p.name} />
                                                         
                                                         {isAdmin && (
-                                                            <button onClick={() => deleteProduct(p.id)} className="absolute top-6 right-6 bg-red-500 text-white p-3 rounded-full shadow-lg hover:bg-red-600 transition-transform"><Icon name="Trash2" size={18}/></button>
+                                                            <div className="absolute top-6 right-6 flex gap-2 z-20">
+                                                                <button onClick={() => updateProduct(p.id, 'inStock', p.inStock === false ? true : false)} className={`p-3 rounded-full shadow-lg transition-transform text-white ${p.inStock === false ? 'bg-slate-500 hover:bg-slate-600' : 'bg-blue-500 hover:bg-blue-600'}`} title={p.inStock === false ? "Mostrar producto" : "Ocultar por falta de stock"}>
+                                                                    <Icon name={p.inStock === false ? "EyeOff" : "Eye"} size={18}/>
+                                                                </button>
+                                                                <button onClick={() => deleteProduct(p.id)} className="bg-red-500 text-white p-3 rounded-full shadow-lg hover:bg-red-600 transition-transform" title="Eliminar producto permanentemente">
+                                                                    <Icon name="Trash2" size={18}/>
+                                                                </button>
+                                                            </div>
                                                         )}
 
-                                                        <div className="absolute top-6 left-6 bg-white/95 backdrop-blur px-4 py-1.5 rounded-full text-[9px] font-black uppercase text-blue-900 shadow-sm border border-slate-100">
+                                                        {p.inStock === false && isAdmin && (
+                                                            <div className="absolute inset-0 bg-slate-900/10 flex flex-col items-center justify-center z-10 pointer-events-none">
+                                                                <span className="bg-slate-800 text-white font-black px-4 py-2 rounded-full uppercase tracking-widest text-xs mb-2">Oculto sin stock</span>
+                                                            </div>
+                                                        )}
+
+                                                        <div className="absolute top-6 left-6 bg-white/95 backdrop-blur px-4 py-1.5 rounded-full text-[9px] font-black uppercase text-blue-900 shadow-sm border border-slate-100 z-20">
                                                             {isAdmin ? <input value={p.brand || ''} className="bg-transparent border-none outline-none w-20 font-black uppercase" onChange={e => updateProduct(p.id, 'brand', e.target.value)} /> : p.brand}
                                                         </div>
                                                     </div>
 
-                                                    <div className="p-8 flex flex-col flex-grow">
+                                                    <div className="p-8 flex flex-col flex-grow relative z-20">
                                                         {isAdmin ? (
                                                             <div className="space-y-4">
                                                                 <div className="bg-orange-50 p-4 rounded-2xl border border-orange-200">
@@ -443,20 +311,13 @@
                                                                 <div className="bg-orange-50 p-4 rounded-2xl border border-orange-200">
                                                                     <label className="block text-[10px] font-black uppercase tracking-widest text-orange-700 mb-2">Categoría</label>
                                                                     <select value={categories.includes(p.category) ? p.category : '__new__'} className="w-full p-3 bg-white rounded-xl text-sm font-bold border border-orange-200 outline-none focus:border-orange-500" onChange={e => handleCategorySelectChange(p.id, e.target.value)}>
-                                                                        {categories.map(category => (
-                                                                            <option key={category} value={category}>{category}</option>
-                                                                        ))}
+                                                                        {categories.map(category => <option key={category} value={category}>{category}</option>)}
                                                                         <option value="__new__">+ Agregar nueva categoría</option>
                                                                     </select>
-                                                                    <input ref={el => categoryInputRefs.current[p.id] = el} defaultValue={categories.includes(p.category) ? '' : (p.category || '')} className="w-full p-3 mt-3 bg-white rounded-xl text-sm font-bold border border-orange-200 outline-none focus:border-orange-500" placeholder="Escribe una nueva categoría y presiona Enter" onKeyDown={e => {
-                                                                        if (e.key === 'Enter') {
-                                                                            e.preventDefault();
-                                                                            handleNewCategorySave(p.id, e.target.value);
-                                                                        }
-                                                                    }} onBlur={e => handleNewCategorySave(p.id, e.target.value)} />
+                                                                    <input ref={el => categoryInputRefs.current[p.id] = el} defaultValue={categories.includes(p.category) ? '' : (p.category || '')} className="w-full p-3 mt-3 bg-white rounded-xl text-sm font-bold border border-orange-200 outline-none focus:border-orange-500" placeholder="Escribe y presiona Enter" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleNewCategorySave(p.id, e.target.value); } }} onBlur={e => handleNewCategorySave(p.id, e.target.value)} />
                                                                 </div>
 
-                                                                <input value={p.name || ''} className="w-full p-3 bg-orange-50 rounded-xl text-sm font-black border border-orange-200 outline-none focus:border-orange-500" placeholder="Nombre del producto..." onChange={e => updateProduct(p.id, 'name', e.target.value)} />
+                                                                <input value={p.name || ''} className="w-full p-3 bg-orange-50 rounded-xl text-sm font-black border border-orange-200 outline-none focus:border-orange-500" placeholder="Nombre..." onChange={e => updateProduct(p.id, 'name', e.target.value)} />
                                                                 <div className="flex gap-3">
                                                                     <input value={p.weight || ''} className="w-1/2 p-3 bg-orange-50 rounded-xl text-xs font-bold border border-orange-200 outline-none" placeholder="Peso..." onChange={e => updateProduct(p.id, 'weight', e.target.value)} />
                                                                     <input type="number" value={p.price || 0} className="w-1/2 p-3 bg-orange-50 rounded-xl text-sm font-black border border-orange-200 outline-none" placeholder="Precio..." onChange={e => updateProduct(p.id, 'price', parseInt(e.target.value) || 0)} />
@@ -464,9 +325,7 @@
                                                             </div>
                                                         ) : (
                                                             <>
-                                                                <div className="mb-3">
-                                                                    <span className="inline-flex px-3 py-1 rounded-full bg-blue-50 text-blue-900 text-[10px] font-black uppercase tracking-widest border border-blue-100">{p.category || 'Sin categoría'}</span>
-                                                                </div>
+                                                                <div className="mb-3"><span className="inline-flex px-3 py-1 rounded-full bg-blue-50 text-blue-900 text-[10px] font-black uppercase tracking-widest border border-blue-100">{p.category || 'Sin categoría'}</span></div>
                                                                 <h3 className="font-black text-2xl text-slate-900 tracking-tighter leading-none mb-1 uppercase">{p.name}</h3>
                                                                 <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-8">{p.weight}</p>
                                                                 
@@ -562,9 +421,7 @@
                                 <p className="text-xl font-black text-slate-800 uppercase tracking-tighter">Marcelo Medel</p>
                             </div>
                         </div>
-                        
                         <p className="text-[10px] font-bold text-slate-300 uppercase tracking-[0.5em] mb-8">Trade SPA • Concepción</p>
-                        
                         {!isAdmin && (
                             <button onClick={() => setShowLogin(true)} className="text-[11px] font-black text-slate-400 uppercase tracking-[0.4em] hover:text-blue-600 transition-all p-4 bg-slate-50 rounded-full border border-slate-100 hover:border-blue-200">Administración</button>
                         )}
@@ -578,4 +435,3 @@
     </script>
 </body>
 </html>
-
