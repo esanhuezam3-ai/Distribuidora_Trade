@@ -20,10 +20,98 @@
 <body class="text-slate-900">
     <div id="root"></div>
 
-    <script type="text/babel">
-        const { useState, useMemo, useEffect } = React;
+    <script type="module">
+      import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js';
+      import {
+        getFirestore,
+        collection,
+        addDoc,
+        doc,
+        updateDoc,
+        deleteDoc,
+        onSnapshot,
+        getDocs,
+        serverTimestamp,
+        setLogLevel
+      } from 'https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js';
 
-        // Íconos nativos
+      const firebaseConfig = {
+        apiKey: "AIzaSyC-d7yJnN9uJOozJvD1kO8JKWl88SrJwRI",
+        authDomain: "catalogo-trade.firebaseapp.com",
+        projectId: "catalogo-trade",
+        storageBucket: "catalogo-trade.firebasestorage.app",
+        messagingSenderId: "599913548649",
+        appId: "1:599913548649:web:aa1c252cea3ac5692ecbf8"
+      };
+
+      const defaultProducts = [
+        { brand: "Milo", name: "Milo Familiar 1kg", weight: "1 Kilo", price: 7900, image: "https://i.bolder.run/r/czo0MDY0LGc6MTAwMHg/4621de96/877759-7613030120582.jpg", createdAt: serverTimestamp() },
+        { brand: "Nescafé", name: "Tradición Lata", weight: "170g", price: 5700, image: "https://santaisabel.vtexassets.com/arquivos/ids/532559-900-900?width=900&height=900&aspect=true", createdAt: serverTimestamp() },
+        { brand: "Nescafé", name: "Tradición XL", weight: "400g", price: 11000, image: "https://media.falabella.com/falabellaCL/126932316_01/w=1200,h=1200,fit=pad", createdAt: serverTimestamp() }
+      ];
+
+      setLogLevel('silent');
+
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+      const productsRef = collection(db, 'products');
+
+      async function seedProductsIfEmpty() {
+        const snap = await getDocs(productsRef);
+        if (snap.empty) {
+          for (const product of defaultProducts) {
+            await addDoc(productsRef, product);
+          }
+        }
+      }
+
+      async function addProduct() {
+        const newProduct = {
+          brand: 'Marca',
+          name: 'Producto Nuevo',
+          weight: '000g',
+          price: 0,
+          image: '',
+          createdAt: serverTimestamp()
+        };
+        await addDoc(productsRef, newProduct);
+      }
+
+      async function updateProduct(id, data) {
+        const productRef = doc(db, 'products', id);
+        await updateDoc(productRef, data);
+      }
+
+      async function deleteProduct(id) {
+        const productRef = doc(db, 'products', id);
+        await deleteDoc(productRef);
+      }
+
+      function subscribeProducts(callback, onError) {
+        return onSnapshot(productsRef, (snapshot) => {
+          const items = snapshot.docs
+            .map((d) => ({ id: d.id, ...d.data() }))
+            .sort((a, b) => {
+              const aSec = a.createdAt?.seconds || 0;
+              const bSec = b.createdAt?.seconds || 0;
+              return bSec - aSec;
+            });
+          callback(items);
+        }, onError);
+      }
+
+      window.firebaseServices = {
+        ready: seedProductsIfEmpty(),
+        addProduct,
+        updateProduct,
+        deleteProduct,
+        subscribeProducts
+      };
+    </script>
+
+    <script type="text/babel">
+        const { useState, useMemo, useEffect, useRef } = React;
+
         const Icon = ({ name, size = 20, className = "" }) => {
             const paths = {
                 ShoppingCart: <React.Fragment><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></React.Fragment>,
@@ -52,27 +140,48 @@
             const [showLogin, setShowLogin] = useState(false);
             const [loginForm, setLoginForm] = useState({ user: '', pass: '' });
             const [loginError, setLoginError] = useState(false);
-            
             const [cart, setCart] = useState([]);
             const [isCartOpen, setIsCartOpen] = useState(false);
             const [searchTerm, setSearchTerm] = useState('');
             const [quantities, setQuantities] = useState({});
-
-            const [products, setProducts] = useState(() => {
-                const saved = localStorage.getItem('trade_catalog');
-                if (saved) return JSON.parse(saved);
-                return [
-                    { id: 1, brand: "Milo", name: "Milo Familiar 1kg", weight: "1 Kilo", price: 7900, image: "https://i.bolder.run/r/czo0MDY0LGc6MTAwMHg/4621de96/877759-7613030120582.jpg" },
-                    { id: 2, brand: "Nescafé", name: "Tradición Lata", weight: "170g", price: 5700, image: "https://santaisabel.vtexassets.com/arquivos/ids/532559-900-900?width=900&height=900&aspect=true" },
-                    { id: 3, brand: "Nescafé", name: "Tradición XL", weight: "400g", price: 11000, image: "https://media.falabella.com/falabellaCL/126932316_01/w=1200,h=1200,fit=pad" }
-                ];
-            });
+            const [products, setProducts] = useState([]);
+            const [loadingProducts, setLoadingProducts] = useState(true);
+            const [firebaseError, setFirebaseError] = useState('');
+            const saveTimers = useRef({});
 
             useEffect(() => {
-                localStorage.setItem('trade_catalog', JSON.stringify(products));
-            }, [products]);
+                let unsubscribe = null;
 
-            const formatCLP = (v) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(v);
+                const start = async () => {
+                    try {
+                        await window.firebaseServices.ready;
+                        unsubscribe = window.firebaseServices.subscribeProducts(
+                            (items) => {
+                                setProducts(items);
+                                setLoadingProducts(false);
+                            },
+                            (error) => {
+                                console.error(error);
+                                setFirebaseError('No se pudo sincronizar con Firebase.');
+                                setLoadingProducts(false);
+                            }
+                        );
+                    } catch (error) {
+                        console.error(error);
+                        setFirebaseError('No se pudo conectar con Firebase. Revisa Firestore y sus reglas.');
+                        setLoadingProducts(false);
+                    }
+                };
+
+                start();
+
+                return () => {
+                    if (unsubscribe) unsubscribe();
+                    Object.values(saveTimers.current).forEach(clearTimeout);
+                };
+            }, []);
+
+            const formatCLP = (v) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(v || 0);
 
             const handleLogin = (e) => {
                 e.preventDefault();
@@ -81,22 +190,40 @@
                 } else { setLoginError(true); }
             };
 
-            const addProduct = () => {
-                const newProduct = { id: Date.now(), brand: "Marca", name: "Producto Nuevo", weight: "000g", price: 0, image: "" };
-                setProducts([newProduct, ...products]);
-            };
-
-            const updateProduct = (id, field, value) => {
-                setProducts(products.map(p => p.id === id ? { ...p, [field]: value } : p));
-            };
-
-            const deleteProduct = (id) => {
-                if(window.confirm("¿Estás seguro de que quieres eliminar este producto?")) {
-                    setProducts(products.filter(p => p.id !== id));
+            const addProduct = async () => {
+                try {
+                    await window.firebaseServices.addProduct();
+                } catch (error) {
+                    console.error(error);
+                    alert('No se pudo crear el producto en Firebase.');
                 }
             };
 
-            // FUNCIÓN NUEVA: Leer imagen subida desde el dispositivo
+            const updateProduct = (id, field, value) => {
+                setProducts(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
+                const timerKey = `${id}_${field}`;
+                if (saveTimers.current[timerKey]) clearTimeout(saveTimers.current[timerKey]);
+                saveTimers.current[timerKey] = setTimeout(async () => {
+                    try {
+                        await window.firebaseServices.updateProduct(id, { [field]: value });
+                    } catch (error) {
+                        console.error(error);
+                        alert('No se pudo guardar el cambio en Firebase.');
+                    }
+                }, 500);
+            };
+
+            const deleteProduct = async (id) => {
+                if(window.confirm("¿Estás seguro de que quieres eliminar este producto?")) {
+                    try {
+                        await window.firebaseServices.deleteProduct(id);
+                    } catch (error) {
+                        console.error(error);
+                        alert('No se pudo eliminar el producto en Firebase.');
+                    }
+                }
+            };
+
             const handleImageUpload = (e, productId) => {
                 const file = e.target.files[0];
                 if (file) {
@@ -118,13 +245,15 @@
                 setQuantities({...quantities, [p.id]: 1});
             };
 
-            const cartTotal = cart.reduce((acc, i) => acc + (i.price * i.qty), 0);
+            const cartTotal = cart.reduce((acc, i) => acc + ((i.price || 0) * i.qty), 0);
 
             const sendWhatsApp = () => {
                 const itemsStr = cart.map(i => `✅ ${i.qty}x ${i.name}`).join('\n');
                 const msg = `*PEDIDO TRADE*\n📍 Zona: Gran Concepción\n\nHola Marcelo, envío mi pedido:\n\n${itemsStr}\n\n💰 *Total Estimado: ${formatCLP(cartTotal)}*`;
                 window.open(`https://wa.me/56961214930?text=${encodeURIComponent(msg)}`, '_blank');
             };
+
+            const filteredProducts = products.filter(p => (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()));
 
             return (
                 <div className="min-h-screen flex flex-col">
@@ -174,74 +303,83 @@
                             </div>
                         </div>
 
+                        {firebaseError && (
+                            <div className="mb-8 rounded-3xl border border-red-200 bg-red-50 p-5 text-sm font-bold text-red-700">
+                                {firebaseError}
+                            </div>
+                        )}
+
                         {isAdmin && (
                             <button onClick={addProduct} className="w-full mb-10 p-10 border-4 border-dashed border-orange-300 bg-orange-50 rounded-[3rem] text-center hover:bg-orange-100 transition-colors group">
                                 <div className="w-16 h-16 bg-orange-600 text-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl group-hover:scale-110 transition-transform">
                                     <Icon name="PlusCircle" size={32} />
                                 </div>
                                 <h3 className="font-black text-orange-950 uppercase tracking-tighter text-xl">Añadir Nuevo Producto</h3>
-                                <p className="text-orange-700 text-xs font-bold uppercase mt-2 opacity-70">Los cambios se guardan en el navegador de este dispositivo</p>
+                                <p className="text-orange-700 text-xs font-bold uppercase mt-2 opacity-70">Ahora los cambios se guardan en Firebase</p>
                             </button>
                         )}
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
-                            {products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())).map(p => (
-                                <div key={p.id} className={`product-card bg-white rounded-[3rem] border-2 flex flex-col group relative ${isAdmin ? 'border-orange-300 shadow-lg' : 'border-slate-100 shadow-sm hover:border-blue-200'}`}>
-                                    <div className="h-64 bg-slate-50 relative flex items-center justify-center p-8 overflow-hidden rounded-t-[3rem]">
-                                        <img src={p.image || 'https://via.placeholder.com/400x400?text=Sube+una+foto'} className="h-full object-contain group-hover:scale-110 transition-transform duration-700" alt={p.name} />
-                                        
-                                        {isAdmin && (
-                                            <button onClick={() => deleteProduct(p.id)} className="absolute top-6 right-6 bg-red-500 text-white p-3 rounded-full shadow-lg hover:bg-red-600 transition-transform"><Icon name="Trash2" size={18}/></button>
-                                        )}
+                        {loadingProducts ? (
+                            <div className="text-center py-20 text-slate-500 font-bold">Cargando productos desde Firebase...</div>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
+                                {filteredProducts.map(p => (
+                                    <div key={p.id} className={`product-card bg-white rounded-[3rem] border-2 flex flex-col group relative ${isAdmin ? 'border-orange-300 shadow-lg' : 'border-slate-100 shadow-sm hover:border-blue-200'}`}>
+                                        <div className="h-64 bg-slate-50 relative flex items-center justify-center p-8 overflow-hidden rounded-t-[3rem]">
+                                            <img src={p.image || 'https://via.placeholder.com/400x400?text=Sube+una+foto'} className="h-full object-contain group-hover:scale-110 transition-transform duration-700" alt={p.name} />
+                                            
+                                            {isAdmin && (
+                                                <button onClick={() => deleteProduct(p.id)} className="absolute top-6 right-6 bg-red-500 text-white p-3 rounded-full shadow-lg hover:bg-red-600 transition-transform"><Icon name="Trash2" size={18}/></button>
+                                            )}
 
-                                        <div className="absolute top-6 left-6 bg-white/95 backdrop-blur px-4 py-1.5 rounded-full text-[9px] font-black uppercase text-blue-900 shadow-sm border border-slate-100">
-                                            {isAdmin ? <input value={p.brand} className="bg-transparent border-none outline-none w-20 font-black uppercase" onChange={e => updateProduct(p.id, 'brand', e.target.value)} /> : p.brand}
+                                            <div className="absolute top-6 left-6 bg-white/95 backdrop-blur px-4 py-1.5 rounded-full text-[9px] font-black uppercase text-blue-900 shadow-sm border border-slate-100">
+                                                {isAdmin ? <input value={p.brand || ''} className="bg-transparent border-none outline-none w-20 font-black uppercase" onChange={e => updateProduct(p.id, 'brand', e.target.value)} /> : p.brand}
+                                            </div>
+                                        </div>
+
+                                        <div className="p-8 flex flex-col flex-grow">
+                                            {isAdmin ? (
+                                                <div className="space-y-4">
+                                                    <div className="bg-orange-50 p-4 rounded-2xl border border-orange-200">
+                                                        <label className="flex items-center gap-2 text-xs font-bold text-orange-900 mb-2 cursor-pointer w-fit hover:text-orange-600 transition-colors">
+                                                            <Icon name="UploadCloud" size={16} /> Subir Foto de Galería
+                                                            <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, p.id)} />
+                                                        </label>
+                                                        <div className="text-[10px] text-orange-600 mb-2">o usa un link de internet:</div>
+                                                        <input value={p.image || ''} className="w-full p-2 bg-white rounded-lg text-[10px] border border-orange-200 outline-none focus:border-orange-500" placeholder="https://link-de-imagen.jpg" onChange={e => updateProduct(p.id, 'image', e.target.value)} />
+                                                    </div>
+
+                                                    <input value={p.name || ''} className="w-full p-3 bg-orange-50 rounded-xl text-sm font-black border border-orange-200 outline-none focus:border-orange-500" placeholder="Nombre del producto..." onChange={e => updateProduct(p.id, 'name', e.target.value)} />
+                                                    <div className="flex gap-3">
+                                                        <input value={p.weight || ''} className="w-1/2 p-3 bg-orange-50 rounded-xl text-xs font-bold border border-orange-200 outline-none" placeholder="Peso..." onChange={e => updateProduct(p.id, 'weight', e.target.value)} />
+                                                        <input type="number" value={p.price || 0} className="w-1/2 p-3 bg-orange-50 rounded-xl text-sm font-black border border-orange-200 outline-none" placeholder="Precio..." onChange={e => updateProduct(p.id, 'price', parseInt(e.target.value) || 0)} />
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <h3 className="font-black text-2xl text-slate-900 tracking-tighter leading-none mb-1 uppercase">{p.name}</h3>
+                                                    <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-8">{p.weight}</p>
+                                                    
+                                                    <div className="bg-slate-50 p-6 rounded-[2rem] flex justify-between items-center mb-8 border border-slate-100 shadow-inner group-hover:bg-blue-50 transition-colors">
+                                                        <div><span className="text-[9px] text-slate-400 font-black uppercase block mb-1">Precio Neto</span><span className="text-3xl font-black text-blue-900 tracking-tighter leading-none">{formatCLP(p.price)}</span></div>
+                                                        <div className="bg-white p-4 rounded-2xl shadow-sm text-blue-200"><Icon name="Package" size={28} /></div>
+                                                    </div>
+
+                                                    <div className="mt-auto flex items-center gap-4">
+                                                        <div className="flex items-center bg-slate-200 rounded-2xl p-1.5 border border-slate-300">
+                                                            <button onClick={() => setQuantities({...quantities, [p.id]: Math.max(1, (quantities[p.id] || 1) - 1)})} className="w-10 h-10 flex items-center justify-center hover:bg-white rounded-xl transition-all shadow-sm active:scale-90"><Icon name="Minus" size={18}/></button>
+                                                            <span className="w-10 text-center font-black text-lg">{quantities[p.id] || 1}</span>
+                                                            <button onClick={() => setQuantities({...quantities, [p.id]: (quantities[p.id] || 1) + 1})} className="w-10 h-10 flex items-center justify-center hover:bg-white rounded-xl transition-all shadow-sm active:scale-90"><Icon name="Plus" size={18}/></button>
+                                                        </div>
+                                                        <button onClick={() => addToCart(p)} className="flex-grow bg-blue-900 text-white font-black py-5 px-6 rounded-[1.5rem] shadow-xl shadow-blue-100 active:scale-95 transition-all text-xs uppercase tracking-widest">Añadir</button>
+                                                    </div>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
-
-                                    <div className="p-8 flex flex-col flex-grow">
-                                        {isAdmin ? (
-                                            <div className="space-y-4">
-                                                {/* NUEVO BOTÓN DE SUBIR ARCHIVO */}
-                                                <div className="bg-orange-50 p-4 rounded-2xl border border-orange-200">
-                                                    <label className="flex items-center gap-2 text-xs font-bold text-orange-900 mb-2 cursor-pointer w-fit hover:text-orange-600 transition-colors">
-                                                        <Icon name="UploadCloud" size={16} /> Subir Foto de Galería
-                                                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, p.id)} />
-                                                    </label>
-                                                    <div className="text-[10px] text-orange-600 mb-2">o usa un link de internet:</div>
-                                                    <input value={p.image} className="w-full p-2 bg-white rounded-lg text-[10px] border border-orange-200 outline-none focus:border-orange-500" placeholder="https://link-de-imagen.jpg" onChange={e => updateProduct(p.id, 'image', e.target.value)} />
-                                                </div>
-
-                                                <input value={p.name} className="w-full p-3 bg-orange-50 rounded-xl text-sm font-black border border-orange-200 outline-none focus:border-orange-500" placeholder="Nombre del producto..." onChange={e => updateProduct(p.id, 'name', e.target.value)} />
-                                                <div className="flex gap-3">
-                                                    <input value={p.weight} className="w-1/2 p-3 bg-orange-50 rounded-xl text-xs font-bold border border-orange-200 outline-none" placeholder="Peso..." onChange={e => updateProduct(p.id, 'weight', e.target.value)} />
-                                                    <input type="number" value={p.price} className="w-1/2 p-3 bg-orange-50 rounded-xl text-sm font-black border border-orange-200 outline-none" placeholder="Precio..." onChange={e => updateProduct(p.id, 'price', parseInt(e.target.value) || 0)} />
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <>
-                                                <h3 className="font-black text-2xl text-slate-900 tracking-tighter leading-none mb-1 uppercase">{p.name}</h3>
-                                                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-8">{p.weight}</p>
-                                                
-                                                <div className="bg-slate-50 p-6 rounded-[2rem] flex justify-between items-center mb-8 border border-slate-100 shadow-inner group-hover:bg-blue-50 transition-colors">
-                                                    <div><span className="text-[9px] text-slate-400 font-black uppercase block mb-1">Precio Neto</span><span className="text-3xl font-black text-blue-900 tracking-tighter leading-none">{formatCLP(p.price)}</span></div>
-                                                    <div className="bg-white p-4 rounded-2xl shadow-sm text-blue-200"><Icon name="Package" size={28} /></div>
-                                                </div>
-
-                                                <div className="mt-auto flex items-center gap-4">
-                                                    <div className="flex items-center bg-slate-200 rounded-2xl p-1.5 border border-slate-300">
-                                                        <button onClick={() => setQuantities({...quantities, [p.id]: Math.max(1, (quantities[p.id] || 1) - 1)})} className="w-10 h-10 flex items-center justify-center hover:bg-white rounded-xl transition-all shadow-sm active:scale-90"><Icon name="Minus" size={18}/></button>
-                                                        <span className="w-10 text-center font-black text-lg">{quantities[p.id] || 1}</span>
-                                                        <button onClick={() => setQuantities({...quantities, [p.id]: (quantities[p.id] || 1) + 1})} className="w-10 h-10 flex items-center justify-center hover:bg-white rounded-xl transition-all shadow-sm active:scale-90"><Icon name="Plus" size={18}/></button>
-                                                    </div>
-                                                    <button onClick={() => addToCart(p)} className="flex-grow bg-blue-900 text-white font-black py-5 px-6 rounded-[1.5rem] shadow-xl shadow-blue-100 active:scale-95 transition-all text-xs uppercase tracking-widest">Añadir</button>
-                                                </div>
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                                ))}
+                            </div>
+                        )}
                     </main>
 
                     {isCartOpen && (
