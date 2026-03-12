@@ -45,9 +45,9 @@
       };
 
       const defaultProducts = [
-        { brand: "Milo", name: "Milo Familiar 1kg", weight: "1 Kilo", price: 7900, image: "https://i.bolder.run/r/czo0MDY0LGc6MTAwMHg/4621de96/877759-7613030120582.jpg", createdAt: serverTimestamp() },
-        { brand: "Nescafé", name: "Tradición Lata", weight: "170g", price: 5700, image: "https://santaisabel.vtexassets.com/arquivos/ids/532559-900-900?width=900&height=900&aspect=true", createdAt: serverTimestamp() },
-        { brand: "Nescafé", name: "Tradición XL", weight: "400g", price: 11000, image: "https://media.falabella.com/falabellaCL/126932316_01/w=1200,h=1200,fit=pad", createdAt: serverTimestamp() }
+        { brand: "Milo", name: "Milo Familiar 1kg", weight: "1 Kilo", price: 7900, image: "https://i.bolder.run/r/czo0MDY0LGc6MTAwMHg/4621de96/877759-7613030120582.jpg", category: 'Abarrotes', createdAt: serverTimestamp() },
+        { brand: "Nescafé", name: "Tradición Lata", weight: "170g", price: 5700, image: "https://santaisabel.vtexassets.com/arquivos/ids/532559-900-900?width=900&height=900&aspect=true", category: 'Abarrotes', createdAt: serverTimestamp() },
+        { brand: "Nescafé", name: "Tradición XL", weight: "400g", price: 11000, image: "https://media.falabella.com/falabellaCL/126932316_01/w=1200,h=1200,fit=pad", category: 'Abarrotes', createdAt: serverTimestamp() }
       ];
 
       setLogLevel('silent');
@@ -72,6 +72,7 @@
           weight: '000g',
           price: 0,
           image: '',
+          category: 'Abarrotes',
           createdAt: serverTimestamp()
         };
         await addDoc(productsRef, newProduct);
@@ -136,6 +137,12 @@
         };
 
         const App = () => {
+            const DEFAULT_CATEGORIES = [
+                'Abarrotes',
+                'Productos de Aseo hogar y productos personales',
+                'Confites'
+            ];
+
             const [isAdmin, setIsAdmin] = useState(false);
             const [showLogin, setShowLogin] = useState(false);
             const [loginForm, setLoginForm] = useState({ user: '', pass: '' });
@@ -147,7 +154,9 @@
             const [products, setProducts] = useState([]);
             const [loadingProducts, setLoadingProducts] = useState(true);
             const [firebaseError, setFirebaseError] = useState('');
+            const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
             const saveTimers = useRef({});
+            const categoryInputRefs = useRef({});
 
             useEffect(() => {
                 let unsubscribe = null;
@@ -158,6 +167,10 @@
                         unsubscribe = window.firebaseServices.subscribeProducts(
                             (items) => {
                                 setProducts(items);
+                                const discoveredCategories = items
+                                    .map(item => (item.category || '').trim())
+                                    .filter(Boolean);
+                                setCategories(Array.from(new Set([...DEFAULT_CATEGORIES, ...discoveredCategories])));
                                 setLoadingProducts(false);
                             },
                             (error) => {
@@ -183,6 +196,30 @@
 
             const formatCLP = (v) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(v || 0);
 
+            const ensureCategoryExists = (categoryName) => {
+                const normalized = (categoryName || '').trim();
+                if (!normalized) return '';
+                setCategories(prev => prev.includes(normalized) ? prev : [...prev, normalized]);
+                return normalized;
+            };
+
+            const handleCategorySelectChange = (productId, selectedValue) => {
+                if (selectedValue === '__new__') {
+                    setTimeout(() => categoryInputRefs.current[productId]?.focus(), 0);
+                    return;
+                }
+                updateProduct(productId, 'category', selectedValue);
+            };
+
+            const handleNewCategorySave = (productId, rawValue) => {
+                const newCategory = ensureCategoryExists(rawValue);
+                if (!newCategory) return;
+                updateProduct(productId, 'category', newCategory);
+                if (categoryInputRefs.current[productId]) {
+                    categoryInputRefs.current[productId].value = '';
+                }
+            };
+
             const handleLogin = (e) => {
                 e.preventDefault();
                 if (loginForm.user === 'admin' && loginForm.pass === 'trade2026') {
@@ -200,12 +237,14 @@
             };
 
             const updateProduct = (id, field, value) => {
-                setProducts(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
+                const finalValue = field === 'category' ? ensureCategoryExists(value) : value;
+                if (field === 'category' && !finalValue) return;
+                setProducts(prev => prev.map(p => p.id === id ? { ...p, [field]: finalValue } : p));
                 const timerKey = `${id}_${field}`;
                 if (saveTimers.current[timerKey]) clearTimeout(saveTimers.current[timerKey]);
                 saveTimers.current[timerKey] = setTimeout(async () => {
                     try {
-                        await window.firebaseServices.updateProduct(id, { [field]: value });
+                        await window.firebaseServices.updateProduct(id, { [field]: finalValue });
                     } catch (error) {
                         console.error(error);
                         alert('No se pudo guardar el cambio en Firebase.');
@@ -253,7 +292,23 @@
                 window.open(`https://wa.me/56961214930?text=${encodeURIComponent(msg)}`, '_blank');
             };
 
-            const filteredProducts = products.filter(p => (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()));
+            const filteredProducts = products.filter(p => {
+                const term = searchTerm.toLowerCase();
+                return [p.name, p.brand, p.weight, p.category || '']
+                    .some(value => (value || '').toLowerCase().includes(term));
+            });
+
+            const groupedProducts = categories
+                .map(category => ({
+                    category,
+                    items: filteredProducts.filter(product => (product.category || 'Abarrotes') === category)
+                }))
+                .filter(group => group.items.length > 0);
+
+            const uncategorizedProducts = filteredProducts.filter(product => !categories.includes(product.category || ''));
+            if (uncategorizedProducts.length > 0) {
+                groupedProducts.push({ category: 'Sin categoría', items: uncategorizedProducts });
+            }
 
             return (
                 <div className="min-h-screen flex flex-col">
@@ -321,62 +376,96 @@
 
                         {loadingProducts ? (
                             <div className="text-center py-20 text-slate-500 font-bold">Cargando productos desde Firebase...</div>
+                        ) : groupedProducts.length === 0 ? (
+                            <div className="text-center py-20 text-slate-500 font-bold">No hay productos para mostrar.</div>
                         ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
-                                {filteredProducts.map(p => (
-                                    <div key={p.id} className={`product-card bg-white rounded-[3rem] border-2 flex flex-col group relative ${isAdmin ? 'border-orange-300 shadow-lg' : 'border-slate-100 shadow-sm hover:border-blue-200'}`}>
-                                        <div className="h-64 bg-slate-50 relative flex items-center justify-center p-8 overflow-hidden rounded-t-[3rem]">
-                                            <img src={p.image || 'https://via.placeholder.com/400x400?text=Sube+una+foto'} className="h-full object-contain group-hover:scale-110 transition-transform duration-700" alt={p.name} />
-                                            
-                                            {isAdmin && (
-                                                <button onClick={() => deleteProduct(p.id)} className="absolute top-6 right-6 bg-red-500 text-white p-3 rounded-full shadow-lg hover:bg-red-600 transition-transform"><Icon name="Trash2" size={18}/></button>
-                                            )}
-
-                                            <div className="absolute top-6 left-6 bg-white/95 backdrop-blur px-4 py-1.5 rounded-full text-[9px] font-black uppercase text-blue-900 shadow-sm border border-slate-100">
-                                                {isAdmin ? <input value={p.brand || ''} className="bg-transparent border-none outline-none w-20 font-black uppercase" onChange={e => updateProduct(p.id, 'brand', e.target.value)} /> : p.brand}
+                            <div className="space-y-14">
+                                {groupedProducts.map(group => (
+                                    <section key={group.category}>
+                                        <div className="flex items-center justify-between mb-6 gap-4">
+                                            <div>
+                                                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-blue-500 mb-2">Categoría</p>
+                                                <h3 className="text-2xl md:text-3xl font-black text-blue-950 tracking-tighter">{group.category}</h3>
                                             </div>
+                                            <div className="px-4 py-2 rounded-full bg-blue-50 text-blue-900 text-xs font-black uppercase tracking-widest border border-blue-100">{group.items.length} producto{group.items.length !== 1 ? 's' : ''}</div>
                                         </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
+                                            {group.items.map(p => (
+                                                <div key={p.id} className={`product-card bg-white rounded-[3rem] border-2 flex flex-col group relative ${isAdmin ? 'border-orange-300 shadow-lg' : 'border-slate-100 shadow-sm hover:border-blue-200'}`}>
+                                                    <div className="h-64 bg-slate-50 relative flex items-center justify-center p-8 overflow-hidden rounded-t-[3rem]">
+                                                        <img src={p.image || 'https://via.placeholder.com/400x400?text=Sube+una+foto'} className="h-full object-contain group-hover:scale-110 transition-transform duration-700" alt={p.name} />
+                                                        
+                                                        {isAdmin && (
+                                                            <button onClick={() => deleteProduct(p.id)} className="absolute top-6 right-6 bg-red-500 text-white p-3 rounded-full shadow-lg hover:bg-red-600 transition-transform"><Icon name="Trash2" size={18}/></button>
+                                                        )}
 
-                                        <div className="p-8 flex flex-col flex-grow">
-                                            {isAdmin ? (
-                                                <div className="space-y-4">
-                                                    <div className="bg-orange-50 p-4 rounded-2xl border border-orange-200">
-                                                        <label className="flex items-center gap-2 text-xs font-bold text-orange-900 mb-2 cursor-pointer w-fit hover:text-orange-600 transition-colors">
-                                                            <Icon name="UploadCloud" size={16} /> Subir Foto de Galería
-                                                            <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, p.id)} />
-                                                        </label>
-                                                        <div className="text-[10px] text-orange-600 mb-2">o usa un link de internet:</div>
-                                                        <input value={p.image || ''} className="w-full p-2 bg-white rounded-lg text-[10px] border border-orange-200 outline-none focus:border-orange-500" placeholder="https://link-de-imagen.jpg" onChange={e => updateProduct(p.id, 'image', e.target.value)} />
+                                                        <div className="absolute top-6 left-6 bg-white/95 backdrop-blur px-4 py-1.5 rounded-full text-[9px] font-black uppercase text-blue-900 shadow-sm border border-slate-100">
+                                                            {isAdmin ? <input value={p.brand || ''} className="bg-transparent border-none outline-none w-20 font-black uppercase" onChange={e => updateProduct(p.id, 'brand', e.target.value)} /> : p.brand}
+                                                        </div>
                                                     </div>
 
-                                                    <input value={p.name || ''} className="w-full p-3 bg-orange-50 rounded-xl text-sm font-black border border-orange-200 outline-none focus:border-orange-500" placeholder="Nombre del producto..." onChange={e => updateProduct(p.id, 'name', e.target.value)} />
-                                                    <div className="flex gap-3">
-                                                        <input value={p.weight || ''} className="w-1/2 p-3 bg-orange-50 rounded-xl text-xs font-bold border border-orange-200 outline-none" placeholder="Peso..." onChange={e => updateProduct(p.id, 'weight', e.target.value)} />
-                                                        <input type="number" value={p.price || 0} className="w-1/2 p-3 bg-orange-50 rounded-xl text-sm font-black border border-orange-200 outline-none" placeholder="Precio..." onChange={e => updateProduct(p.id, 'price', parseInt(e.target.value) || 0)} />
+                                                    <div className="p-8 flex flex-col flex-grow">
+                                                        {isAdmin ? (
+                                                            <div className="space-y-4">
+                                                                <div className="bg-orange-50 p-4 rounded-2xl border border-orange-200">
+                                                                    <label className="flex items-center gap-2 text-xs font-bold text-orange-900 mb-2 cursor-pointer w-fit hover:text-orange-600 transition-colors">
+                                                                        <Icon name="UploadCloud" size={16} /> Subir Foto de Galería
+                                                                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, p.id)} />
+                                                                    </label>
+                                                                    <div className="text-[10px] text-orange-600 mb-2">o usa un link de internet:</div>
+                                                                    <input value={p.image || ''} className="w-full p-2 bg-white rounded-lg text-[10px] border border-orange-200 outline-none focus:border-orange-500" placeholder="https://link-de-imagen.jpg" onChange={e => updateProduct(p.id, 'image', e.target.value)} />
+                                                                </div>
+
+                                                                <div className="bg-orange-50 p-4 rounded-2xl border border-orange-200">
+                                                                    <label className="block text-[10px] font-black uppercase tracking-widest text-orange-700 mb-2">Categoría</label>
+                                                                    <select value={categories.includes(p.category) ? p.category : '__new__'} className="w-full p-3 bg-white rounded-xl text-sm font-bold border border-orange-200 outline-none focus:border-orange-500" onChange={e => handleCategorySelectChange(p.id, e.target.value)}>
+                                                                        {categories.map(category => (
+                                                                            <option key={category} value={category}>{category}</option>
+                                                                        ))}
+                                                                        <option value="__new__">+ Agregar nueva categoría</option>
+                                                                    </select>
+                                                                    <input ref={el => categoryInputRefs.current[p.id] = el} defaultValue={categories.includes(p.category) ? '' : (p.category || '')} className="w-full p-3 mt-3 bg-white rounded-xl text-sm font-bold border border-orange-200 outline-none focus:border-orange-500" placeholder="Escribe una nueva categoría y presiona Enter" onKeyDown={e => {
+                                                                        if (e.key === 'Enter') {
+                                                                            e.preventDefault();
+                                                                            handleNewCategorySave(p.id, e.target.value);
+                                                                        }
+                                                                    }} onBlur={e => handleNewCategorySave(p.id, e.target.value)} />
+                                                                </div>
+
+                                                                <input value={p.name || ''} className="w-full p-3 bg-orange-50 rounded-xl text-sm font-black border border-orange-200 outline-none focus:border-orange-500" placeholder="Nombre del producto..." onChange={e => updateProduct(p.id, 'name', e.target.value)} />
+                                                                <div className="flex gap-3">
+                                                                    <input value={p.weight || ''} className="w-1/2 p-3 bg-orange-50 rounded-xl text-xs font-bold border border-orange-200 outline-none" placeholder="Peso..." onChange={e => updateProduct(p.id, 'weight', e.target.value)} />
+                                                                    <input type="number" value={p.price || 0} className="w-1/2 p-3 bg-orange-50 rounded-xl text-sm font-black border border-orange-200 outline-none" placeholder="Precio..." onChange={e => updateProduct(p.id, 'price', parseInt(e.target.value) || 0)} />
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                <div className="mb-3">
+                                                                    <span className="inline-flex px-3 py-1 rounded-full bg-blue-50 text-blue-900 text-[10px] font-black uppercase tracking-widest border border-blue-100">{p.category || 'Sin categoría'}</span>
+                                                                </div>
+                                                                <h3 className="font-black text-2xl text-slate-900 tracking-tighter leading-none mb-1 uppercase">{p.name}</h3>
+                                                                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-8">{p.weight}</p>
+                                                                
+                                                                <div className="bg-slate-50 p-6 rounded-[2rem] flex justify-between items-center mb-8 border border-slate-100 shadow-inner group-hover:bg-blue-50 transition-colors">
+                                                                    <div><span className="text-[9px] text-slate-400 font-black uppercase block mb-1">Precio Neto</span><span className="text-3xl font-black text-blue-900 tracking-tighter leading-none">{formatCLP(p.price)}</span></div>
+                                                                    <div className="bg-white p-4 rounded-2xl shadow-sm text-blue-200"><Icon name="Package" size={28} /></div>
+                                                                </div>
+
+                                                                <div className="mt-auto flex items-center gap-4">
+                                                                    <div className="flex items-center bg-slate-200 rounded-2xl p-1.5 border border-slate-300">
+                                                                        <button onClick={() => setQuantities({...quantities, [p.id]: Math.max(1, (quantities[p.id] || 1) - 1)})} className="w-10 h-10 flex items-center justify-center hover:bg-white rounded-xl transition-all shadow-sm active:scale-90"><Icon name="Minus" size={18}/></button>
+                                                                        <span className="w-10 text-center font-black text-lg">{quantities[p.id] || 1}</span>
+                                                                        <button onClick={() => setQuantities({...quantities, [p.id]: (quantities[p.id] || 1) + 1})} className="w-10 h-10 flex items-center justify-center hover:bg-white rounded-xl transition-all shadow-sm active:scale-90"><Icon name="Plus" size={18}/></button>
+                                                                    </div>
+                                                                    <button onClick={() => addToCart(p)} className="flex-grow bg-blue-900 text-white font-black py-5 px-6 rounded-[1.5rem] shadow-xl shadow-blue-100 active:scale-95 transition-all text-xs uppercase tracking-widest">Añadir</button>
+                                                                </div>
+                                                            </>
+                                                        )}
                                                     </div>
                                                 </div>
-                                            ) : (
-                                                <>
-                                                    <h3 className="font-black text-2xl text-slate-900 tracking-tighter leading-none mb-1 uppercase">{p.name}</h3>
-                                                    <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-8">{p.weight}</p>
-                                                    
-                                                    <div className="bg-slate-50 p-6 rounded-[2rem] flex justify-between items-center mb-8 border border-slate-100 shadow-inner group-hover:bg-blue-50 transition-colors">
-                                                        <div><span className="text-[9px] text-slate-400 font-black uppercase block mb-1">Precio Neto</span><span className="text-3xl font-black text-blue-900 tracking-tighter leading-none">{formatCLP(p.price)}</span></div>
-                                                        <div className="bg-white p-4 rounded-2xl shadow-sm text-blue-200"><Icon name="Package" size={28} /></div>
-                                                    </div>
-
-                                                    <div className="mt-auto flex items-center gap-4">
-                                                        <div className="flex items-center bg-slate-200 rounded-2xl p-1.5 border border-slate-300">
-                                                            <button onClick={() => setQuantities({...quantities, [p.id]: Math.max(1, (quantities[p.id] || 1) - 1)})} className="w-10 h-10 flex items-center justify-center hover:bg-white rounded-xl transition-all shadow-sm active:scale-90"><Icon name="Minus" size={18}/></button>
-                                                            <span className="w-10 text-center font-black text-lg">{quantities[p.id] || 1}</span>
-                                                            <button onClick={() => setQuantities({...quantities, [p.id]: (quantities[p.id] || 1) + 1})} className="w-10 h-10 flex items-center justify-center hover:bg-white rounded-xl transition-all shadow-sm active:scale-90"><Icon name="Plus" size={18}/></button>
-                                                        </div>
-                                                        <button onClick={() => addToCart(p)} className="flex-grow bg-blue-900 text-white font-black py-5 px-6 rounded-[1.5rem] shadow-xl shadow-blue-100 active:scale-95 transition-all text-xs uppercase tracking-widest">Añadir</button>
-                                                    </div>
-                                                </>
-                                            )}
+                                            ))}
                                         </div>
-                                    </div>
+                                    </section>
                                 ))}
                             </div>
                         )}
