@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Catálogo Trade - Distribuidora</title>
     
-    <!-- Librerías básicas que Chrome SÍ permite cargar localmente sin bloqueos -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
@@ -16,6 +15,8 @@
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
         .product-card { transition: all 0.3s ease; }
         .product-card:hover { transform: translateY(-8px); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #1e3a8a; border-radius: 10px; }
     </style>
 </head>
 <body class="text-slate-900">
@@ -24,7 +25,6 @@
     <script type="text/babel">
         const { useState, useMemo, useEffect } = React;
 
-        // Íconos nativos
         const Icon = ({ name, size = 20, className = "" }) => {
             const paths = {
                 ShoppingCart: <React.Fragment><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></React.Fragment>,
@@ -58,7 +58,6 @@
             const [searchTerm, setSearchTerm] = useState('');
             const [quantities, setQuantities] = useState({});
 
-            // Base de datos local (se guarda en tu PC)
             const [products, setProducts] = useState(() => {
                 const saved = localStorage.getItem('trade_catalog');
                 if (saved) return JSON.parse(saved);
@@ -75,7 +74,6 @@
 
             const formatCLP = (v) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(v);
 
-            // Funciones de Administrador
             const handleLogin = (e) => {
                 e.preventDefault();
                 if (loginForm.user === 'admin' && loginForm.pass === 'trade2026') {
@@ -93,10 +91,11 @@
             };
 
             const deleteProduct = (id) => {
-                setProducts(products.filter(p => p.id !== id));
+                if(window.confirm("¿Estás seguro de que quieres eliminar este producto?")) {
+                    setProducts(products.filter(p => p.id !== id));
+                }
             };
 
-            // Funciones del Carrito
             const addToCart = (p) => {
                 const qty = quantities[p.id] || 1;
                 setCart(prev => {
@@ -117,7 +116,6 @@
 
             return (
                 <div className="min-h-screen flex flex-col">
-                    {/* Barra Superior - Cambia de color si es Admin */}
                     <div className={`${isAdmin ? 'bg-orange-600' : 'bg-blue-950'} text-white px-4 py-2 text-xs flex justify-between font-bold uppercase tracking-widest sticky top-0 z-50`}>
                         <div className="flex items-center gap-2">
                             <Icon name={isAdmin ? "Lock" : "MapPin"} size={12} className={isAdmin ? "text-white" : "text-blue-400"} /> 
@@ -130,11 +128,10 @@
                         )}
                     </div>
 
-                    {/* Cabecera */}
                     <header className="bg-white/90 backdrop-blur-md border-b sticky top-[32px] z-40 px-4 py-4 shadow-sm">
                         <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
                             <div className="flex items-center gap-2">
-                                <div className="w-12 h-12 bg-blue-900 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-xl transform -rotate-3">T</div>
+                                <div className="w-12 h-12 bg-blue-900 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-xl">T</div>
                                 <div className="leading-none">
                                     <h1 className="text-2xl font-black text-blue-950 uppercase tracking-tighter">Trade</h1>
                                     <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mt-1">Distribuidora</p>
@@ -153,41 +150,36 @@
                         </div>
                     </header>
 
-                    {/* Contenido Principal */}
                     <main className="max-w-6xl mx-auto p-6 flex-grow w-full">
                         <div className="mb-12 rounded-[2.5rem] bg-blue-900 p-8 md:p-12 text-white relative overflow-hidden flex flex-col md:flex-row justify-between items-center gap-8 shadow-2xl">
                             <div className="relative z-10 text-center md:text-left">
-                                <h2 className="text-4xl md:text-5xl font-black italic mb-2 uppercase tracking-tighter leading-tight">Stock Mayorista.</h2>
-                                <p className="text-blue-200 text-sm font-semibold uppercase tracking-widest opacity-90 italic">Marcelo Medel • Distribuidor Oficial</p>
+                                <h2 className="text-4xl md:text-5xl font-black mb-2 uppercase tracking-tighter leading-tight">Stock Mayorista.</h2>
+                                <p className="text-blue-200 text-sm font-semibold uppercase tracking-widest opacity-90">Marcelo Medel • Distribuidor Oficial</p>
                             </div>
                             <div className="z-10 bg-white/10 backdrop-blur-xl p-6 rounded-3xl border border-white/20 text-center min-w-[150px]">
                                 <div className="text-[10px] font-black text-blue-300 tracking-widest mb-1 uppercase">Catálogo</div>
                                 <div className="text-3xl font-black tracking-tighter uppercase leading-none">2026</div>
                             </div>
-                            <div className="absolute top-0 right-0 w-1/3 h-full bg-blue-700/20 -skew-x-12 translate-x-10"></div>
                         </div>
 
-                        {/* Botón Añadir Producto (Solo visible si es Admin) */}
                         {isAdmin && (
                             <button onClick={addProduct} className="w-full mb-10 p-10 border-4 border-dashed border-orange-300 bg-orange-50 rounded-[3rem] text-center hover:bg-orange-100 transition-colors group">
                                 <div className="w-16 h-16 bg-orange-600 text-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl group-hover:scale-110 transition-transform">
                                     <Icon name="PlusCircle" size={32} />
                                 </div>
                                 <h3 className="font-black text-orange-950 uppercase tracking-tighter text-xl">Añadir Nuevo Producto</h3>
-                                <p className="text-orange-700 text-xs font-bold uppercase mt-2 opacity-70">Los cambios se guardan en tu PC</p>
+                                <p className="text-orange-700 text-xs font-bold uppercase mt-2 opacity-70">Los cambios se guardan en tu navegador</p>
                             </button>
                         )}
 
-                        {/* Grilla de Productos */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
                             {products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())).map(p => (
                                 <div key={p.id} className={`product-card bg-white rounded-[3rem] border-2 flex flex-col group relative ${isAdmin ? 'border-orange-300 shadow-lg' : 'border-slate-100 shadow-sm hover:border-blue-200'}`}>
                                     <div className="h-64 bg-slate-50 relative flex items-center justify-center p-8 overflow-hidden rounded-t-[3rem]">
                                         <img src={p.image || 'https://via.placeholder.com/400x400?text=Subir+Imagen'} className="h-full object-contain group-hover:scale-110 transition-transform duration-700" alt={p.name} />
                                         
-                                        {/* Botón Eliminar (Solo Admin) */}
                                         {isAdmin && (
-                                            <button onClick={() => deleteProduct(p.id)} className="absolute top-6 right-6 bg-red-500 text-white p-3 rounded-full shadow-lg hover:bg-red-600 transition-transform hover:rotate-12"><Icon name="Trash2" size={18}/></button>
+                                            <button onClick={() => deleteProduct(p.id)} className="absolute top-6 right-6 bg-red-500 text-white p-3 rounded-full shadow-lg hover:bg-red-600 transition-transform"><Icon name="Trash2" size={18}/></button>
                                         )}
 
                                         <div className="absolute top-6 left-6 bg-white/95 backdrop-blur px-4 py-1.5 rounded-full text-[9px] font-black uppercase text-blue-900 shadow-sm border border-slate-100">
@@ -197,7 +189,6 @@
 
                                     <div className="p-8 flex flex-col flex-grow">
                                         {isAdmin ? (
-                                            /* Formulario de Edición (Admin) */
                                             <div className="space-y-4">
                                                 <input value={p.image} className="w-full p-3 bg-orange-50 rounded-xl text-[10px] border border-orange-200 outline-none focus:border-orange-500" placeholder="Link de imagen..." onChange={e => updateProduct(p.id, 'image', e.target.value)} />
                                                 <input value={p.name} className="w-full p-3 bg-orange-50 rounded-xl text-sm font-black border border-orange-200 outline-none focus:border-orange-500" placeholder="Nombre del producto..." onChange={e => updateProduct(p.id, 'name', e.target.value)} />
@@ -207,7 +198,6 @@
                                                 </div>
                                             </div>
                                         ) : (
-                                            /* Vista Normal Cliente */
                                             <>
                                                 <h3 className="font-black text-2xl text-slate-900 tracking-tighter leading-none mb-1 uppercase">{p.name}</h3>
                                                 <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-8">{p.weight}</p>
@@ -233,13 +223,12 @@
                         </div>
                     </main>
 
-                    {/* Carrito Lateral */}
                     {isCartOpen && (
                         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[100] flex justify-end">
                             <div className="bg-white w-full max-w-md flex flex-col shadow-2xl rounded-l-[3.5rem] h-full overflow-hidden border-l border-white/20">
                                 <div className="p-10 border-b flex justify-between items-center bg-blue-50/50 rounded-tl-[3.5rem]">
                                     <div className="flex items-center gap-5">
-                                        <div className="bg-blue-900 p-4 rounded-2xl text-white shadow-xl transform -rotate-3"><Icon name="ShoppingCart" size={28} /></div>
+                                        <div className="bg-blue-900 p-4 rounded-2xl text-white shadow-xl"><Icon name="ShoppingCart" size={28} /></div>
                                         <div><h2 className="text-2xl font-black uppercase tracking-tighter text-blue-950 leading-none">Mi Pedido</h2><p className="text-[10px] text-blue-500 font-black uppercase mt-1 tracking-widest">Trade Distribuidora</p></div>
                                     </div>
                                     <button onClick={() => setIsCartOpen(false)} className="p-3.5 hover:bg-white rounded-full transition-all group"><Icon name="X" size={36} className="text-slate-300 group-hover:text-slate-900" /></button>
@@ -253,7 +242,7 @@
                                                 <img src={item.image} className="w-20 h-20 object-contain flex-shrink-0" alt="" />
                                                 <div className="flex-grow min-w-0">
                                                     <div className="flex justify-between items-start mb-2">
-                                                        <h4 className="font-black text-sm truncate uppercase tracking-tight text-slate-800 italic">{item.name}</h4>
+                                                        <h4 className="font-black text-sm truncate uppercase tracking-tight text-slate-800">{item.name}</h4>
                                                         <button onClick={() => setCart(c => c.filter(i => i.id !== item.id))} className="text-slate-300 hover:text-red-500 p-1"><Icon name="Trash2" size={20} /></button>
                                                     </div>
                                                     <div className="flex items-center justify-between mt-4">
@@ -270,14 +259,13 @@
                                         <div className="flex justify-between items-center mb-10 px-4">
                                             <div><span className="text-slate-400 font-black uppercase text-[11px] tracking-[0.4em] block mb-2">Inversión Final</span><span className="text-5xl font-black text-blue-950 tracking-tighter">{formatCLP(cartTotal)}</span></div>
                                         </div>
-                                        <button onClick={sendWhatsApp} className="w-full bg-green-600 text-white font-black py-8 rounded-[2.5rem] flex items-center justify-center gap-5 shadow-2xl shadow-green-100 active:scale-95 transition-all text-xl uppercase tracking-widest transform hover:-rotate-1"><Icon name="MessageCircle" size={36} /> Confirmar Pedido</button>
+                                        <button onClick={sendWhatsApp} className="w-full bg-green-600 text-white font-black py-8 rounded-[2.5rem] flex items-center justify-center gap-5 shadow-2xl shadow-green-100 active:scale-95 transition-all text-xl uppercase tracking-widest"><Icon name="MessageCircle" size={36} /> Confirmar Pedido</button>
                                     </div>
                                 )}
                             </div>
                         </div>
                     )}
 
-                    {/* Modal Acceso Administrador */}
                     {showLogin && (
                         <div className="fixed inset-0 bg-blue-950/95 backdrop-blur-md z-[110] flex items-center justify-center p-4">
                             <div className="bg-white w-full max-w-sm rounded-[3.5rem] p-12 shadow-2xl relative text-center border-2 border-white/20">
@@ -294,19 +282,17 @@
                         </div>
                     )}
 
-                    {/* Pie de Página y botón Admin */}
                     <footer className="py-24 text-center border-t bg-white mt-12 w-full">
-                        <div className="max-w-xs mx-auto mb-10 bg-slate-50 p-8 rounded-[4rem] border border-slate-100 shadow-sm flex items-center justify-center gap-4 transform rotate-3">
+                        <div className="max-w-xs mx-auto mb-10 bg-slate-50 p-8 rounded-[4rem] border border-slate-100 shadow-sm flex items-center justify-center gap-4">
                             <div className="w-14 h-14 bg-blue-900 rounded-[1.25rem] flex items-center justify-center text-white font-black text-xl shadow-xl shadow-blue-100">MM</div>
                             <div className="text-left leading-none">
                                 <p className="text-[10px] text-slate-400 font-black uppercase mb-1 tracking-widest">Tu Vendedor</p>
-                                <p className="text-xl font-black text-slate-800 uppercase tracking-tighter italic">Marcelo Medel</p>
+                                <p className="text-xl font-black text-slate-800 uppercase tracking-tighter">Marcelo Medel</p>
                             </div>
                         </div>
                         
                         <p className="text-[10px] font-bold text-slate-300 uppercase tracking-[0.5em] mb-8">Trade SPA • Concepción</p>
                         
-                        {/* Botón para entrar al panel de Admin */}
                         {!isAdmin && (
                             <button onClick={() => setShowLogin(true)} className="text-[11px] font-black text-slate-400 uppercase tracking-[0.4em] hover:text-blue-600 transition-all p-4 bg-slate-50 rounded-full border border-slate-100 hover:border-blue-200">Administración</button>
                         )}
