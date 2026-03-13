@@ -98,6 +98,7 @@
             const [firebaseError, setFirebaseError] = useState('');
             const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
             const [selectedCategory, setSelectedCategory] = useState('Todas');
+            const [showNewCategoryInput, setShowNewCategoryInput] = useState({});
             const saveTimers = useRef({});
             const categoryInputRefs = useRef({});
 
@@ -131,7 +132,12 @@
             };
 
             const handleCategorySelectChange = (productId, selectedValue) => {
-                if (selectedValue === '__new__') { setTimeout(() => categoryInputRefs.current[productId]?.focus(), 0); return; }
+                if (selectedValue === '__new__') {
+                    setShowNewCategoryInput(prev => ({ ...prev, [productId]: true }));
+                    setTimeout(() => categoryInputRefs.current[productId]?.focus(), 0);
+                    return;
+                }
+                setShowNewCategoryInput(prev => ({ ...prev, [productId]: false }));
                 updateProduct(productId, 'category', selectedValue);
             };
 
@@ -139,6 +145,7 @@
                 const newCategory = ensureCategoryExists(rawValue);
                 if (!newCategory) return;
                 updateProduct(productId, 'category', newCategory);
+                setShowNewCategoryInput(prev => ({ ...prev, [productId]: false }));
                 if (categoryInputRefs.current[productId]) categoryInputRefs.current[productId].value = '';
             };
 
@@ -217,7 +224,7 @@
                     </div>
 
                     <header className="bg-white/90 backdrop-blur-md border-b sticky top-[32px] z-40 px-4 py-4 shadow-sm">
-                        <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
+                        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
                             <div className="flex items-center gap-2">
                                 <div className="w-12 h-12 bg-blue-900 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-xl">T</div>
                                 <div className="leading-none"><h1 className="text-2xl font-black text-blue-950 uppercase tracking-tighter">Trade</h1><p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mt-1">Distribuidora</p></div>
@@ -310,11 +317,13 @@
 
                                                                 <div className="bg-orange-50 p-4 rounded-2xl border border-orange-200">
                                                                     <label className="block text-[10px] font-black uppercase tracking-widest text-orange-700 mb-2">Categoría</label>
-                                                                    <select value={categories.includes(p.category) ? p.category : '__new__'} className="w-full p-3 bg-white rounded-xl text-sm font-bold border border-orange-200 outline-none focus:border-orange-500" onChange={e => handleCategorySelectChange(p.id, e.target.value)}>
+                                                                    <select value={showNewCategoryInput[p.id] ? '__new__' : (categories.includes(p.category) ? p.category : 'Abarrotes')} className="w-full p-3 bg-white rounded-xl text-sm font-bold border border-orange-200 outline-none focus:border-orange-500" onChange={e => handleCategorySelectChange(p.id, e.target.value)}>
                                                                         {categories.map(category => <option key={category} value={category}>{category}</option>)}
                                                                         <option value="__new__">+ Agregar nueva categoría</option>
                                                                     </select>
-                                                                    <input ref={el => categoryInputRefs.current[p.id] = el} defaultValue={categories.includes(p.category) ? '' : (p.category || '')} className="w-full p-3 mt-3 bg-white rounded-xl text-sm font-bold border border-orange-200 outline-none focus:border-orange-500" placeholder="Escribe y presiona Enter" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleNewCategorySave(p.id, e.target.value); } }} onBlur={e => handleNewCategorySave(p.id, e.target.value)} />
+                                                                    {showNewCategoryInput[p.id] && (
+                                                                        <input ref={el => categoryInputRefs.current[p.id] = el} className="w-full p-3 mt-3 bg-white rounded-xl text-sm font-bold border border-orange-200 outline-none focus:border-orange-500" placeholder="Nueva categoría y Enter" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleNewCategorySave(p.id, e.target.value); e.target.value = ''; } }} />
+                                                                    )}
                                                                 </div>
 
                                                                 <input value={p.name || ''} className="w-full p-3 bg-orange-50 rounded-xl text-sm font-black border border-orange-200 outline-none focus:border-orange-500" placeholder="Nombre..." onChange={e => updateProduct(p.id, 'name', e.target.value)} />
