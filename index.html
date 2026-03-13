@@ -329,7 +329,19 @@
                                                                 <input value={p.name || ''} className="w-full p-3 bg-orange-50 rounded-xl text-sm font-black border border-orange-200 outline-none focus:border-orange-500" placeholder="Nombre..." onChange={e => updateProduct(p.id, 'name', e.target.value)} />
                                                                 <div className="flex gap-3">
                                                                     <input value={p.weight || ''} className="w-1/2 p-3 bg-orange-50 rounded-xl text-xs font-bold border border-orange-200 outline-none" placeholder="Peso..." onChange={e => updateProduct(p.id, 'weight', e.target.value)} />
-                                                                    <input type="number" value={p.price || 0} className="w-1/2 p-3 bg-orange-50 rounded-xl text-sm font-black border border-orange-200 outline-none" placeholder="Precio..." onChange={e => updateProduct(p.id, 'price', parseInt(e.target.value) || 0)} />
+                                                                    <div className="relative w-1/2">
+<span className="absolute left-3 top-1/2 -translate-y-1/2 font-black text-slate-500">$</span>
+<input
+type="text"
+value={p.price ? p.price.toLocaleString('es-CL') : ''}
+className="w-full pl-7 p-3 bg-orange-50 rounded-xl text-sm font-black border border-orange-200 outline-none"
+placeholder="5.590"
+onChange={e => {
+ const v = e.target.value.replace(/\D/g,'');
+ updateProduct(p.id,'price', v ? parseInt(v) : 0);
+}}
+/>
+</div>
                                                                 </div>
                                                             </div>
                                                         ) : (
